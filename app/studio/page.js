@@ -26,6 +26,8 @@ const TONES = {
   ],
 };
 
+const TODAY_TEST_CAPTION = `ร้านอาหารยุคใหม่ ไม่ต้องไล่จดออเดอร์เองแล้ว 🧾\n\nนี่คือ 2BOrder ระบบที่เราใช้กับร้านจริงทุกวัน ตั้งแต่รับออเดอร์ จัดคิว เช็กการชำระเงิน ไปจนถึง Delivery, Rider และสมาชิกสะสมแต้ม\n\nเราไม่ได้ทำระบบนี้ไว้โชว์ครับ — ใช้งานจริง เจอปัญหาจริง แล้วค่อย ๆ ปรับจากหน้างานจริง 😊\n\n#2BOrder #ระบบร้านอาหาร #รับออเดอร์ออนไลน์ #Delivery #Rider`;
+
 export default function StudioPage() {
   const [mode, setMode] = useState('food');
   const [title, setTitle] = useState('');
@@ -50,6 +52,16 @@ export default function StudioPage() {
       .replaceAll('{review}', review.trim() || 'อร่อยมาก บริการดี สั่งง่าย')
       .replaceAll('{benefit}', benefit.trim() || 'ช่วยลดงานซ้ำ ลดความผิดพลาด และทำให้จัดการออเดอร์ง่ายขึ้น');
     setCaption(next);
+  };
+
+  const loadTodayTest = () => {
+    setMode('system');
+    setTitle('ร้านอาหารยุคใหม่ ไม่ต้องไล่จดออเดอร์เอง');
+    setBenefit('ลูกค้าสั่งเอง • ร้านเห็นคิว • เช็กเงิน • จัดส่ง • สมาชิกและแต้มสะสม');
+    setImageFile(null);
+    setImageUrl('https://2border.vercel.app/api/demo-card');
+    setCaption(TODAY_TEST_CAPTION);
+    setStatus('โหลดโพสต์ทดสอบวันนี้แล้ว ✓ ตรวจรูปและแคปชันก่อนกดโพสต์');
   };
 
   const publish = async () => {
@@ -93,6 +105,14 @@ export default function StudioPage() {
         </div>
         <a href="/" className="studio-back">← Publisher</a>
       </div>
+
+      <section style={{ marginBottom: 18, padding: 18, borderRadius: 18, background: '#eef6ff', border: '1px solid #bfdcff', display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div>
+          <strong style={{ display: 'block', fontSize: 18 }}>✨ เทสโหมด “คิดโพสต์ให้วันนี้”</strong>
+          <small style={{ color: '#526071' }}>ผมเตรียมหัวข้อ + ภาพ + แคปชันไว้ให้แล้ว กดโหลดแล้วตรวจ Preview ได้ทันที</small>
+        </div>
+        <button type="button" onClick={loadTodayTest} style={{ width: 'auto', marginTop: 0, paddingInline: 20 }}>โหลดโพสต์ทดสอบวันนี้</button>
+      </section>
 
       <section className="mode-grid">
         {MODES.map((item) => (
