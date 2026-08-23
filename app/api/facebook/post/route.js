@@ -28,6 +28,20 @@ async function resolvePageToken(configuredToken, pageId) {
   return { token: page.access_token, source: 'derived-from-user-token', identity: { id: page.id, name: page.name } };
 }
 
+async function uploadPhoto({ pageId, token, message, file }) {
+  const graphForm = new FormData();
+  graphForm.append('access_token', token);
+  graphForm.append('published', 'true');
+  if (message) graphForm.append('caption', message);
+  graphForm.append('source', file, file.name || 'upload.jpg');
+
+  return fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
+    method: 'POST',
+    body: graphForm,
+    cache: 'no-store',
+  });
+}
+
 export async function POST(request) {
   try {
     const pageId = process.env.FACEBOOK_PAGE_ID;
@@ -64,41 +78,46 @@ export async function POST(request) {
     let type;
 
     if (imageFile) {
-      const graphForm = new FormData();
-      graphForm.append('access_token', resolved.token);
-      graphForm.append('published', 'true');
-      if (cleanMessage) graphForm.append('caption', cleanMessage);
-      graphForm.append('source', imageFile, imageFile.name || 'upload.jpg');
+      response = await uploadPhoto({ pageId, token: resolved.token, message: cleanMessage, file: imageFile });
+      type = 'photo';
+    } else if (cleanImageUrl) {
+      let parsed;
+      try {
+        parsed = new URL(cleanImageUrl);
+      } catch {
+        return Response.json({ error: 'Image URL is invalid' }, { status: 400 });
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return Response.json({ error: 'Image URL must use http or https' }, { status: 400 });
+      }
 
-      response = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
-        method: 'POST',
-        body: graphForm,
-        cache: 'no-store',
-      });
+      const imageRes = await fetch(cleanImageUrl, { cache: 'no-store' });
+      if (!imageRes.ok) {
+        return Response.json({ error: `Could not download image (${imageRes.status})` }, { status: 400 });
+      }
+
+      const mime = imageRes.headers.get('content-type') || 'image/jpeg';
+      if (!mime.startsWith('image/')) {
+        return Response.json({ error: `URL did not return an image (${mime})` }, { status: 400 });
+      }
+
+      const bytes = await imageRes.arrayBuffer();
+      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+      const remoteFile = new File([bytes], `remote-image.${ext}`, { type: mime });
+      response = await uploadPhoto({ pageId, token: resolved.token, message: cleanMessage, file: remoteFile });
       type = 'photo';
     } else {
       const body = new URLSearchParams();
       body.set('access_token', resolved.token);
+      body.set('message', cleanMessage);
 
-      let endpoint;
-      if (cleanImageUrl) {
-        endpoint = `https://graph.facebook.com/v26.0/${pageId}/photos`;
-        body.set('url', cleanImageUrl);
-        body.set('published', 'true');
-        if (cleanMessage) body.set('caption', cleanMessage);
-        type = 'photo';
-      } else {
-        endpoint = `https://graph.facebook.com/v26.0/${pageId}/feed`;
-        body.set('message', cleanMessage);
-        type = 'text';
-      }
-
-      response = await fetch(endpoint, {
+      response = await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
         cache: 'no-store',
       });
+      type = 'text';
     }
 
     const data = await response.json();
