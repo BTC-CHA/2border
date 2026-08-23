@@ -1,16 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [message, setMessage] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
   async function publishPost() {
-    if (!message.trim() && !imageUrl.trim()) {
-      setStatus('กรุณาใส่ข้อความหรือ URL รูปภาพก่อนโพสต์');
+    if (!message.trim() && !imageUrl.trim() && !imageFile) {
+      setStatus('กรุณาใส่ข้อความหรือเลือกรูปภาพก่อนโพสต์');
       return;
     }
 
@@ -18,11 +30,20 @@ export default function Home() {
     setStatus('กำลังโพสต์...');
 
     try {
-      const res = await fetch('/api/facebook/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, imageUrl }),
-      });
+      let res;
+
+      if (imageFile) {
+        const form = new FormData();
+        form.append('message', message);
+        form.append('image', imageFile);
+        res = await fetch('/api/facebook/post', { method: 'POST', body: form });
+      } else {
+        res = await fetch('/api/facebook/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, imageUrl }),
+        });
+      }
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'โพสต์ไม่สำเร็จ');
@@ -30,12 +51,17 @@ export default function Home() {
       setStatus(`โพสต์สำเร็จ ✓ ${data.type === 'photo' ? 'Photo' : 'Post'} ID: ${data.id || '-'}`);
       setMessage('');
       setImageUrl('');
+      setImageFile(null);
+      const input = document.getElementById('imageFile');
+      if (input) input.value = '';
     } catch (err) {
       setStatus(`ผิดพลาด: ${err.message}`);
     } finally {
       setLoading(false);
     }
   }
+
+  const effectivePreview = previewUrl || imageUrl.trim();
 
   return (
     <main className="shell">
@@ -53,24 +79,46 @@ export default function Home() {
           rows={7}
         />
 
-        <label htmlFor="imageUrl" style={{ marginTop: 16 }}>URL รูปภาพ (ถ้ามี)</label>
+        <label htmlFor="imageFile" style={{ marginTop: 16 }}>เลือกรูปจากเครื่อง</label>
+        <input
+          id="imageFile"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(e) => {
+            const file = e.target.files?.[0] || null;
+            setImageFile(file);
+            if (file) setImageUrl('');
+          }}
+          style={{ width: '100%', border: '1px solid #d5d9e2', borderRadius: 16, padding: 12, font: 'inherit', marginBottom: 8 }}
+        />
+
+        <div style={{ textAlign: 'center', color: '#8a94a6', margin: '10px 0' }}>หรือ</div>
+
+        <label htmlFor="imageUrl">URL รูปภาพ</label>
         <input
           id="imageUrl"
           type="url"
           value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
+          onChange={(e) => {
+            setImageUrl(e.target.value);
+            if (e.target.value.trim()) {
+              setImageFile(null);
+              const input = document.getElementById('imageFile');
+              if (input) input.value = '';
+            }
+          }}
           placeholder="https://example.com/menu.jpg"
           style={{ width: '100%', border: '1px solid #d5d9e2', borderRadius: 16, padding: 14, font: 'inherit', marginBottom: 8 }}
         />
 
-        {imageUrl.trim() && (
+        {effectivePreview && (
           <div style={{ marginTop: 12, border: '1px solid #e7e9ee', borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
-            <img src={imageUrl} alt="Preview" style={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain' }} />
+            <img src={effectivePreview} alt="Preview" style={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain' }} />
           </div>
         )}
 
         <button onClick={publishPost} disabled={loading}>
-          {loading ? 'กำลังโพสต์...' : imageUrl.trim() ? 'โพสต์รูป + แคปชัน' : 'โพสต์ Facebook'}
+          {loading ? 'กำลังโพสต์...' : (imageFile || imageUrl.trim()) ? 'โพสต์รูป + แคปชัน' : 'โพสต์ Facebook'}
         </button>
 
         {status && <div className="status">{status}</div>}
