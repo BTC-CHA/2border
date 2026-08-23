@@ -30,29 +30,41 @@ async function resolvePageToken(configuredToken, pageId) {
 
 export async function POST(request) {
   try {
-    const { message } = await request.json();
+    const { message = '', imageUrl = '' } = await request.json();
+    const cleanMessage = message.trim();
+    const cleanImageUrl = imageUrl.trim();
 
-    if (!message || !message.trim()) {
-      return Response.json({ error: 'Message is required' }, { status: 400 });
+    if (!cleanMessage && !cleanImageUrl) {
+      return Response.json({ error: 'Message or image URL is required' }, { status: 400 });
     }
 
     const pageId = process.env.FACEBOOK_PAGE_ID;
     const configuredToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
 
     if (!pageId || !configuredToken) {
-      return Response.json(
-        { error: 'Facebook environment variables are not configured' },
-        { status: 500 }
-      );
+      return Response.json({ error: 'Facebook environment variables are not configured' }, { status: 500 });
     }
 
     const resolved = await resolvePageToken(configuredToken, pageId);
-
     const body = new URLSearchParams();
-    body.set('message', message.trim());
     body.set('access_token', resolved.token);
 
-    const response = await fetch(`https://graph.facebook.com/v26.0/${pageId}/feed`, {
+    let endpoint;
+    let type;
+
+    if (cleanImageUrl) {
+      endpoint = `https://graph.facebook.com/v26.0/${pageId}/photos`;
+      body.set('url', cleanImageUrl);
+      body.set('published', 'true');
+      if (cleanMessage) body.set('caption', cleanMessage);
+      type = 'photo';
+    } else {
+      endpoint = `https://graph.facebook.com/v26.0/${pageId}/feed`;
+      body.set('message', cleanMessage);
+      type = 'text';
+    }
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
@@ -62,20 +74,19 @@ export async function POST(request) {
     const data = await response.json();
 
     if (!response.ok) {
-      return Response.json(
-        {
-          error: data?.error?.message || 'Facebook API request failed',
-          details: data?.error || null,
-          tokenSource: resolved.source,
-          tokenIdentity: resolved.identity,
-        },
-        { status: response.status }
-      );
+      return Response.json({
+        error: data?.error?.message || 'Facebook API request failed',
+        details: data?.error || null,
+        tokenSource: resolved.source,
+        tokenIdentity: resolved.identity,
+      }, { status: response.status });
     }
 
     return Response.json({
       ok: true,
-      id: data.id,
+      type,
+      id: data.post_id || data.id || null,
+      result: data,
       tokenSource: resolved.source,
       tokenIdentity: resolved.identity,
     });
