@@ -54,14 +54,27 @@ export default function StudioPage() {
     setCaption(next);
   };
 
-  const loadTodayTest = () => {
+  const loadTodayTest = async () => {
     setMode('system');
     setTitle('ร้านอาหารยุคใหม่ ไม่ต้องไล่จดออเดอร์เอง');
     setBenefit('ลูกค้าสั่งเอง • ร้านเห็นคิว • เช็กเงิน • จัดส่ง • สมาชิกและแต้มสะสม');
-    setImageFile(null);
-    setImageUrl('https://2border.vercel.app/api/demo-card');
+    setImageUrl('');
     setCaption(TODAY_TEST_CAPTION);
-    setStatus('โหลดโพสต์ทดสอบวันนี้แล้ว ✓ ตรวจรูปและแคปชันก่อนกดโพสต์');
+    setStatus('กำลังเตรียมรูปโพสต์...');
+
+    try {
+      const res = await fetch('/api/demo-card', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`โหลดรูปไม่สำเร็จ (${res.status})`);
+      const blob = await res.blob();
+      const type = blob.type || 'image/png';
+      const ext = type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : 'png';
+      const file = new File([blob], `2border-today.${ext}`, { type });
+      setImageFile(file);
+      setStatus('โหลดโพสต์ทดสอบวันนี้แล้ว ✓ รูปถูกเตรียมเป็นไฟล์จริง พร้อมโพสต์');
+    } catch (error) {
+      setImageFile(null);
+      setStatus(`เตรียมรูปไม่สำเร็จ: ${error.message}`);
+    }
   };
 
   const publish = async () => {
