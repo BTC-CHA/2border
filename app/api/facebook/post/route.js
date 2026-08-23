@@ -30,14 +30,6 @@ async function resolvePageToken(configuredToken, pageId) {
 
 export async function POST(request) {
   try {
-    const { message = '', imageUrl = '' } = await request.json();
-    const cleanMessage = message.trim();
-    const cleanImageUrl = imageUrl.trim();
-
-    if (!cleanMessage && !cleanImageUrl) {
-      return Response.json({ error: 'Message or image URL is required' }, { status: 400 });
-    }
-
     const pageId = process.env.FACEBOOK_PAGE_ID;
     const configuredToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
 
@@ -45,31 +37,69 @@ export async function POST(request) {
       return Response.json({ error: 'Facebook environment variables are not configured' }, { status: 500 });
     }
 
-    const resolved = await resolvePageToken(configuredToken, pageId);
-    const body = new URLSearchParams();
-    body.set('access_token', resolved.token);
+    const contentType = request.headers.get('content-type') || '';
+    let cleanMessage = '';
+    let cleanImageUrl = '';
+    let imageFile = null;
 
-    let endpoint;
-    let type;
-
-    if (cleanImageUrl) {
-      endpoint = `https://graph.facebook.com/v26.0/${pageId}/photos`;
-      body.set('url', cleanImageUrl);
-      body.set('published', 'true');
-      if (cleanMessage) body.set('caption', cleanMessage);
-      type = 'photo';
+    if (contentType.includes('multipart/form-data')) {
+      const form = await request.formData();
+      cleanMessage = String(form.get('message') || '').trim();
+      const candidate = form.get('image');
+      if (candidate && typeof candidate !== 'string' && candidate.size > 0) {
+        imageFile = candidate;
+      }
     } else {
-      endpoint = `https://graph.facebook.com/v26.0/${pageId}/feed`;
-      body.set('message', cleanMessage);
-      type = 'text';
+      const json = await request.json();
+      cleanMessage = String(json.message || '').trim();
+      cleanImageUrl = String(json.imageUrl || '').trim();
     }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-      cache: 'no-store',
-    });
+    if (!cleanMessage && !cleanImageUrl && !imageFile) {
+      return Response.json({ error: 'Message or image is required' }, { status: 400 });
+    }
+
+    const resolved = await resolvePageToken(configuredToken, pageId);
+    let response;
+    let type;
+
+    if (imageFile) {
+      const graphForm = new FormData();
+      graphForm.append('access_token', resolved.token);
+      graphForm.append('published', 'true');
+      if (cleanMessage) graphForm.append('caption', cleanMessage);
+      graphForm.append('source', imageFile, imageFile.name || 'upload.jpg');
+
+      response = await fetch(`https://graph.facebook.com/v26.0/${pageId}/photos`, {
+        method: 'POST',
+        body: graphForm,
+        cache: 'no-store',
+      });
+      type = 'photo';
+    } else {
+      const body = new URLSearchParams();
+      body.set('access_token', resolved.token);
+
+      let endpoint;
+      if (cleanImageUrl) {
+        endpoint = `https://graph.facebook.com/v26.0/${pageId}/photos`;
+        body.set('url', cleanImageUrl);
+        body.set('published', 'true');
+        if (cleanMessage) body.set('caption', cleanMessage);
+        type = 'photo';
+      } else {
+        endpoint = `https://graph.facebook.com/v26.0/${pageId}/feed`;
+        body.set('message', cleanMessage);
+        type = 'text';
+      }
+
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        cache: 'no-store',
+      });
+    }
 
     const data = await response.json();
 
