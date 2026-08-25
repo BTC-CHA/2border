@@ -10,6 +10,7 @@ export default function TeacherLayout({ children }) {
   const [session,setSession]=useState(null);
   const [isTeacher,setIsTeacher]=useState(false);
   const [setupNeeded,setSetupNeeded]=useState(false);
+  const [mode,setMode]=useState('signup');
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
 
@@ -72,11 +73,13 @@ export default function TeacherLayout({ children }) {
   if(loading)return <main className="vx-page"><div className="vx-wrap"><div className="vx-empty">กำลังตรวจสอบสิทธิ์ครู...</div></div></main>;
 
   if(!session){
+    const showSignup=setupNeeded && mode==='signup';
     return <main className="vx-page"><div className="vx-wrap"><section className="vx-card vx-login">
-      <div className="vx-logo">VX</div><p className="vx-kicker" style={{marginTop:14}}>TEACHER ACCESS</p><h2>{setupNeeded?'ตั้งค่าครูคนแรก':'Teacher Login'}</h2>
-      <p>{setupNeeded?'ยังไม่มีบัญชีครูใน VerifyX สร้างบัญชีแรกได้จากหน้านี้':'เข้าสู่ระบบด้วยบัญชีครู VerifyX'}</p>
-      {setupNeeded ? <form className="vx-form" onSubmit={signUp}><label>ชื่อครู<input name="displayName" placeholder="Teacher" required/></label><label>Email<input name="email" type="email" required/></label><label>Password<input name="password" type="password" minLength="8" required/></label><button className="vx-btn primary"><ShieldCheck size={16}/>สร้างบัญชีครูคนแรก</button></form>
+      <div className="vx-logo">VX</div><p className="vx-kicker" style={{marginTop:14}}>TEACHER ACCESS</p><h2>{showSignup?'ตั้งค่าครูคนแรก':'Teacher Login'}</h2>
+      <p>{showSignup?'ยังไม่มีบัญชีครูใน VerifyX สร้างบัญชีแรกได้จากหน้านี้':'เข้าสู่ระบบด้วยบัญชีครู VerifyX'}</p>
+      {showSignup ? <form className="vx-form" onSubmit={signUp}><label>ชื่อครู<input name="displayName" placeholder="Teacher" required/></label><label>Email<input name="email" type="email" required/></label><label>Password<input name="password" type="password" minLength="8" required/></label><button className="vx-btn primary"><ShieldCheck size={16}/>สร้างบัญชีครูคนแรก</button></form>
       : <form className="vx-form" onSubmit={signIn}><label>Email<input name="email" type="email" required/></label><label>Password<input name="password" type="password" required/></label><button className="vx-btn primary"><LockKeyhole size={16}/>Login</button></form>}
+      {setupNeeded&&<button className="vx-btn secondary" style={{marginTop:12,width:'100%'}} onClick={()=>{setMode(showSignup?'login':'signup');setError('');setMessage('')}}>{showSignup?'มีบัญชีที่ยืนยันแล้ว → Login':'กลับไปสร้างบัญชีครูคนแรก'}</button>}
       {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
       <Link className="vx-file" href="/verifyx">กลับหน้า VerifyX</Link>
     </section></div></main>;
