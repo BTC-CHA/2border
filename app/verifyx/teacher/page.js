@@ -1,69 +1,30 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { vx } from '../vxClient';
+import {ArrowLeft,Plus,Trash2,BookOpen,UsersRound,LockKeyhole,ChevronRight} from 'lucide-react';
+import {vx} from '../vxClient';
 import TeacherNav from './TeacherNav';
 
 const statusLabel={draft:'ฉบับร่าง',open:'เปิดรับงาน',closed:'ปิดรับงาน'};
 const diffLabel={basic:'Basic',pro:'Pro',advanced:'Advanced'};
 
 export default function TeacherPage(){
-  const [items,setItems]=useState([]); const [startedAssignments,setStartedAssignments]=useState(new Set()); const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [message,setMessage]=useState(''); const [show,setShow]=useState(false); const [saving,setSaving]=useState(false); const [busyId,setBusyId]=useState(null);
-  const submitLock=useRef(false);
-  async function load(){setLoading(true);setError('');const [{data,error},{data:pr,error:pe}]=await Promise.all([vx.from('vx_assignments').select('*, vx_questions(count)').order('created_at',{ascending:false}),vx.from('vx_student_assignment_progress').select('assignment_id')]);if(error||pe)setError((error||pe).message);setItems(data||[]);setStartedAssignments(new Set((pr||[]).map(x=>Number(x.assignment_id))));setLoading(false)}
-  useEffect(()=>{load()},[]);
-
-  async function getPoolInfo(difficulty){
-    const {data:families,error:familyError}=await vx.from('vx_question_families').select('id').eq('category','part_modeling').eq('difficulty',difficulty).eq('is_active',true);
-    if(familyError)throw familyError;
-    const ids=(families||[]).map(f=>f.id);
-    if(!ids.length)return {familyCount:0,variantCount:0};
-    const {data:variants,error:variantError}=await vx.from('vx_question_bank').select('family_id').in('family_id',ids).eq('is_active',true);
-    if(variantError)throw variantError;
-    return {familyCount:new Set((variants||[]).map(v=>v.family_id)).size,variantCount:(variants||[]).length};
-  }
-
-  async function ensurePool(difficulty,questionCount){
-    const pool=await getPoolInfo(difficulty);
-    if(pool.familyCount<questionCount){
-      const missing=questionCount-pool.familyCount;
-      throw new Error(`Question Bank ระดับ ${diffLabel[difficulty]||difficulty} มี Family พร้อมใช้ ${pool.familyCount} Family แต่ Assignment ต้องการ ${questionCount} ข้อ — ขาดอีก ${missing} Family`);
-    }
-    return pool;
-  }
-
-  async function create(e){
-    e.preventDefault(); if(submitLock.current)return; submitLock.current=true; setSaving(true); setError(''); setMessage('');
-    const form=e.currentTarget; const fd=new FormData(form);
-    try{
-      const difficulty=String(fd.get('difficulty')||'basic');
-      const questionCount=Number(fd.get('questionCount')||1);
-      await ensurePool(difficulty,questionCount);
-      const {error}=await vx.from('vx_assignments').insert({title:String(fd.get('title')||'').trim(),course:String(fd.get('course')||'').trim(),description:String(fd.get('description')||'').trim(),status:fd.get('status')||'draft',max_attempts:1,question_category:'part_modeling',difficulty,question_count:questionCount,randomize_questions:fd.get('randomize')==='on'});
-      if(error)throw error;
-      form.reset(); setShow(false); setMessage('สร้าง Assignment เรียบร้อยแล้ว และ Question Bank มีโจทย์เพียงพอ'); await load(); window.scrollTo({top:0,behavior:'smooth'});
-    }catch(err){setError(err.message)}finally{setSaving(false);submitLock.current=false}
-  }
-
-  async function setStatus(a,status){
-    setBusyId(a.id);setError('');setMessage('');
-    try{
-      if(status==='open')await ensurePool(a.difficulty||'basic',Number(a.question_count||1));
-      const {error}=await vx.from('vx_assignments').update({status,updated_at:new Date().toISOString()}).eq('id',a.id);
-      if(error)throw error;
-      setMessage(`เปลี่ยน “${a.title}” เป็น ${statusLabel[status]} แล้ว`);await load();
-    }catch(err){setError(err.message)}finally{setBusyId(null)}
-  }
-
-  async function removeEmpty(a){if(startedAssignments.has(Number(a.id)))return setError('Assignment นี้มีประวัตินักเรียนแล้ว ห้ามลบ ให้ปิดรับงานแทน');const count=a.vx_questions?.[0]?.count||0;if(count>0)return setError('Assignment ที่มีโจทย์เดิมแล้วต้องลบโจทย์ก่อน');if(!window.confirm(`ลบ “${a.title}” ใช่ไหม?`))return;setBusyId(a.id);setError('');setMessage('');const {error}=await vx.from('vx_assignments').delete().eq('id',a.id);setBusyId(null);if(error)return setError(error.message);setMessage('ลบ Assignment ที่ยังไม่มีประวัตินักเรียนแล้ว');load()}
-  return <main className="vx-page"><div className="vx-wrap">
-    <TeacherNav active="assignments"/>
-    <header className="vx-top"><div><Link className="vx-file" href="/verifyx"><ArrowLeft size={15}/>VerifyX</Link><p className="vx-kicker" style={{marginTop:14}}>TEACHER MODE</p><h1>Assignments</h1><p>เลือกระดับ จำนวนข้อ และให้ระบบสุ่มจาก Question Bank</p></div><div className="vx-toolbar"><button className="vx-btn primary" onClick={()=>setShow(v=>!v)}><Plus size={16}/>สร้าง Assignment</button></div></header>
-    {message&&<div className="vx-success">{message}</div>}
-    {show&&<section className="vx-card"><h3>สร้าง Assignment</h3><form className="vx-form" onSubmit={create}><label>ชื่อ Assignment<input name="title" required/></label><label>วิชา / Course<input name="course"/></label><label>คำอธิบาย<textarea name="description" rows="3"/></label><div className="vx-form-row"><label>หมวด<select name="category" defaultValue="part_modeling" disabled><option value="part_modeling">Part Modeling</option></select></label><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>จำนวนข้อ<input name="questionCount" type="number" min="1" defaultValue="3" required/></label><label>สถานะ<select name="status" defaultValue="draft"><option value="draft">ฉบับร่าง</option><option value="open">เปิดรับงาน</option><option value="closed">ปิดรับงาน</option></select></label></div><label><span><input name="randomize" type="checkbox" defaultChecked/> สุ่มโจทย์ให้นักเรียน</span></label><div className="vx-empty" style={{marginTop:0}}>ก่อนสร้างและก่อนเปิดรับงาน ระบบจะเช็กว่า Question Bank ระดับที่เลือกมี Family พร้อมใช้ครบตามจำนวนข้อ · Final Submit ได้ครั้งเดียว</div><button className="vx-btn primary" disabled={saving}>{saving?'กำลังตรวจคลังโจทย์...':'บันทึก'}</button></form></section>}
-    {error&&<div className="vx-error">{error}</div>}
-    {loading?<div className="vx-empty">กำลังโหลด...</div>:<section className="vx-list">{items.length?items.map(a=>{const oldCount=a.vx_questions?.[0]?.count||0;const hasHistory=startedAssignments.has(Number(a.id));return <article className="vx-item" key={a.id}><div><h3>{a.title}</h3><p>{a.course||'ไม่ระบุวิชา'}</p><div className="vx-tags"><span>Part Modeling</span><span>{diffLabel[a.difficulty]||a.difficulty}</span><span>{a.randomize_questions?'สุ่ม':'ไม่สุ่ม'} {a.question_count} ข้อ</span><span>Final ครั้งเดียว</span>{hasHistory&&<span>🔒 มีประวัตินักเรียน</span>}{oldCount>0&&<span>โจทย์เดิม {oldCount} ข้อ</span>}</div></div><div className="vx-toolbar"><span className="vx-status">{statusLabel[a.status]||a.status}</span>{a.status!=='open'&&<button className="vx-link secondary" disabled={busyId===a.id} onClick={()=>setStatus(a,'open')}>เปิดรับงาน</button>}{a.status==='open'&&<button className="vx-link secondary" disabled={busyId===a.id} onClick={()=>setStatus(a,'closed')}>ปิดรับงาน</button>}<Link className="vx-link secondary" href={`/verifyx/teacher/assignment/${a.id}`}>จัดการ</Link>{!hasHistory&&oldCount===0&&<button className="vx-link secondary" disabled={busyId===a.id} onClick={()=>removeEmpty(a)}><Trash2 size={14}/>ลบ</button>}</div></article>}):<div className="vx-empty">ยังไม่มี Assignment</div>}</section>}
-  </div></main>
+ const [items,setItems]=useState([]),[startedAssignments,setStartedAssignments]=useState(new Set()),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState(''),[show,setShow]=useState(false),[saving,setSaving]=useState(false),[busyId,setBusyId]=useState(null);
+ const submitLock=useRef(false);
+ async function load(){setLoading(true);setError('');const [{data,error},{data:pr,error:pe}]=await Promise.all([vx.from('vx_assignments').select('*, vx_questions(count)').order('created_at',{ascending:false}),vx.from('vx_student_assignment_progress').select('assignment_id')]);if(error||pe)setError((error||pe).message);setItems(data||[]);setStartedAssignments(new Set((pr||[]).map(x=>Number(x.assignment_id))));setLoading(false)}
+ useEffect(()=>{load()},[]);
+ const stats=useMemo(()=>({total:items.length,open:items.filter(x=>x.status==='open').length,draft:items.filter(x=>x.status==='draft').length,locked:items.filter(x=>startedAssignments.has(Number(x.id))).length}),[items,startedAssignments]);
+ async function getPoolInfo(difficulty){const {data:families,error:familyError}=await vx.from('vx_question_families').select('id').eq('category','part_modeling').eq('difficulty',difficulty).eq('is_active',true);if(familyError)throw familyError;const ids=(families||[]).map(f=>f.id);if(!ids.length)return {familyCount:0,variantCount:0};const {data:variants,error:variantError}=await vx.from('vx_question_bank').select('family_id').in('family_id',ids).eq('is_active',true);if(variantError)throw variantError;return {familyCount:new Set((variants||[]).map(v=>v.family_id)).size,variantCount:(variants||[]).length}}
+ async function ensurePool(difficulty,questionCount){const pool=await getPoolInfo(difficulty);if(pool.familyCount<questionCount){const missing=questionCount-pool.familyCount;throw new Error(`Question Bank ระดับ ${diffLabel[difficulty]||difficulty} มี Family พร้อมใช้ ${pool.familyCount} Family แต่ Assignment ต้องการ ${questionCount} ข้อ — ขาดอีก ${missing} Family`)}return pool}
+ async function create(e){e.preventDefault();if(submitLock.current)return;submitLock.current=true;setSaving(true);setError('');setMessage('');const form=e.currentTarget;const fd=new FormData(form);try{const difficulty=String(fd.get('difficulty')||'basic');const questionCount=Number(fd.get('questionCount')||1);await ensurePool(difficulty,questionCount);const {error}=await vx.from('vx_assignments').insert({title:String(fd.get('title')||'').trim(),course:String(fd.get('course')||'').trim(),description:String(fd.get('description')||'').trim(),status:fd.get('status')||'draft',max_attempts:1,question_category:'part_modeling',difficulty,question_count:questionCount,randomize_questions:fd.get('randomize')==='on'});if(error)throw error;form.reset();setShow(false);setMessage('สร้าง Assignment เรียบร้อยแล้ว');await load();window.scrollTo({top:0,behavior:'smooth'})}catch(err){setError(err.message)}finally{setSaving(false);submitLock.current=false}}
+ async function setStatus(a,status){setBusyId(a.id);setError('');setMessage('');try{if(status==='open')await ensurePool(a.difficulty||'basic',Number(a.question_count||1));const {error}=await vx.from('vx_assignments').update({status,updated_at:new Date().toISOString()}).eq('id',a.id);if(error)throw error;setMessage(`เปลี่ยน “${a.title}” เป็น ${statusLabel[status]} แล้ว`);await load()}catch(err){setError(err.message)}finally{setBusyId(null)}}
+ async function removeEmpty(a){if(startedAssignments.has(Number(a.id)))return setError('Assignment นี้มีประวัตินักเรียนแล้ว ห้ามลบ ให้ปิดรับงานแทน');const count=a.vx_questions?.[0]?.count||0;if(count>0)return setError('Assignment ที่มีโจทย์เดิมแล้วต้องลบโจทย์ก่อน');if(!window.confirm(`ลบ “${a.title}” ใช่ไหม?`))return;setBusyId(a.id);setError('');setMessage('');const {error}=await vx.from('vx_assignments').delete().eq('id',a.id);setBusyId(null);if(error)return setError(error.message);setMessage('ลบ Assignment แล้ว');load()}
+ return <main className="vx-page"><div className="vx-wrap"><TeacherNav active="assignments"/>
+  <section className="vx-dashboard-head"><div><Link className="vx-file" href="/verifyx"><ArrowLeft size={15}/>VerifyX</Link><p className="vx-kicker" style={{marginTop:14}}>TEACHER MODE</p><h1>Assignments</h1><p>สร้างงาน เปิดรับ และติดตามงานจาก Question Bank ในที่เดียว</p></div><button className="vx-btn primary vx-create-btn" onClick={()=>setShow(v=>!v)}><Plus size={17}/>{show?'ปิดฟอร์ม':'สร้าง Assignment'}</button></section>
+  <section className="vx-overview-strip"><div><small>ทั้งหมด</small><strong>{stats.total}</strong></div><div><small>เปิดรับงาน</small><strong>{stats.open}</strong></div><div><small>ฉบับร่าง</small><strong>{stats.draft}</strong></div><div><small>มีประวัตินักเรียน</small><strong>{stats.locked}</strong></div></section>
+  {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
+  {show&&<section className="vx-card vx-create-panel"><div className="vx-section-title"><div><p className="vx-kicker">NEW ASSIGNMENT</p><h2>สร้าง Assignment ใหม่</h2></div></div><form className="vx-form" onSubmit={create}><div className="vx-form-row"><label>ชื่อ Assignment<input name="title" required placeholder="เช่น การบ้าน #02"/></label><label>วิชา / Course<input name="course" placeholder="เช่น Drawing 001"/></label></div><label>คำอธิบาย<textarea name="description" rows="3" placeholder="รายละเอียดงานหรือคำแนะนำเพิ่มเติม"/></label><div className="vx-form-row"><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label><label>จำนวนข้อ<input name="questionCount" type="number" min="1" defaultValue="3" required/></label></div><div className="vx-form-row"><label>สถานะ<select name="status" defaultValue="draft"><option value="draft">ฉบับร่าง</option><option value="open">เปิดรับงาน</option><option value="closed">ปิดรับงาน</option></select></label><label className="vx-checkline"><input name="randomize" type="checkbox" defaultChecked/><span>สุ่มโจทย์ให้นักเรียน</span></label></div><div className="vx-empty" style={{marginTop:0}}>ระบบจะตรวจ Question Bank ว่ามี Family เพียงพอก่อนสร้างและก่อนเปิดรับงาน</div><button className="vx-btn primary" disabled={saving}>{saving?'กำลังตรวจคลังโจทย์...':'บันทึก Assignment'}</button></form></section>}
+  {loading?<div className="vx-empty">กำลังโหลด...</div>:<section className="vx-assignment-grid">{items.length?items.map(a=>{const oldCount=a.vx_questions?.[0]?.count||0;const hasHistory=startedAssignments.has(Number(a.id));return <article className="vx-assignment-card" key={a.id}><div className="vx-assignment-main"><div className="vx-assignment-icon"><BookOpen size={20}/></div><div className="vx-assignment-copy"><div className="vx-assignment-title-row"><h3>{a.title}</h3><span className={`vx-assignment-status ${a.status}`}>{statusLabel[a.status]||a.status}</span></div><p>{a.course||'ไม่ระบุวิชา'}</p><div className="vx-assignment-meta"><span>{diffLabel[a.difficulty]||a.difficulty}</span><span>{a.question_count} ข้อ</span><span>{a.randomize_questions?'สุ่มโจทย์':'ไม่สุ่ม'}</span>{hasHistory&&<span><LockKeyhole size={12}/>ล็อกกติกาแล้ว</span>}</div></div></div><div className="vx-assignment-footer"><div className="vx-assignment-note">{hasHistory?<><UsersRound size={14}/>มีนักเรียนเริ่มงานแล้ว</>:<><UsersRound size={14}/>ยังไม่มีประวัตินักเรียน</>}</div><div className="vx-assignment-actions">{a.status!=='open'&&<button className="vx-link secondary" disabled={busyId===a.id} onClick={()=>setStatus(a,'open')}>เปิดรับงาน</button>}{a.status==='open'&&<button className="vx-link secondary" disabled={busyId===a.id} onClick={()=>setStatus(a,'closed')}>ปิดรับงาน</button>}<Link className="vx-link primary" href={`/verifyx/teacher/assignment/${a.id}`}>จัดการ<ChevronRight size={15}/></Link>{!hasHistory&&oldCount===0&&<button className="vx-icon-btn danger" title="ลบ" disabled={busyId===a.id} onClick={()=>removeEmpty(a)}><Trash2 size={15}/></button>}</div></div></article>}):<div className="vx-empty">ยังไม่มี Assignment</div>}</section>}
+ </div></main>
 }
