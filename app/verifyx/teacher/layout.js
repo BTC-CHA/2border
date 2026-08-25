@@ -46,7 +46,8 @@ export default function TeacherLayout({ children }) {
     const email=String(fd.get('email')).trim();
     const password=String(fd.get('password'));
     const displayName=String(fd.get('displayName')||'Teacher').trim();
-    const {data,error}=await vx.auth.signUp({email,password});
+    const emailRedirectTo=`${window.location.origin}/verifyx/teacher`;
+    const {data,error}=await vx.auth.signUp({email,password,options:{emailRedirectTo}});
     if(error){setError(error.message);return;}
     if(data.session){
       const {data:claimed,error:claimError}=await vx.rpc('vx_bootstrap_teacher',{p_display_name:displayName});
@@ -54,7 +55,7 @@ export default function TeacherLayout({ children }) {
       else if(claimed){setMessage('สร้างบัญชีครูเรียบร้อย');await refresh(data.session);}
     } else {
       localStorage.setItem('vx-pending-teacher-name',displayName);
-      setMessage('สร้างบัญชีแล้ว กรุณายืนยันอีเมล จากนั้นกลับมา Login เพื่อเปิดสิทธิ์ครูคนแรก');
+      setMessage('สร้างบัญชีแล้ว กรุณายืนยันอีเมล จากนั้นระบบจะพากลับมาที่หน้า Teacher โดยอัตโนมัติ');
     }
   }
 
