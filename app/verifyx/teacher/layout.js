@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {BookOpen,Library,UsersRound,BarChart3,School,SlidersHorizontal,UserCircle,LockKeyhole,LogOut,ShieldCheck,Users} from 'lucide-react';
 import {vx} from '../vxClient';
+import './teacher-ui.css';
 
 const PENDING_KEY='vx-pending-school-onboarding';
 const nav=[
