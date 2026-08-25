@@ -91,5 +91,5 @@ export default function TeacherLayout({ children }) {
       {error&&<div className="vx-error">{error}</div>}<button className="vx-btn secondary" onClick={signOut}>ออกจากระบบ</button></section></div></main>;
   }
 
-  return <><div className="vx-teacherbar"><div className="vx-teacherbar-inner"><nav><Link href="/verifyx/teacher">Assignments</Link><Link href="/verifyx/teacher/students">Students</Link><Link href="/verifyx/teacher/results">Results</Link><Link href="/verifyx/teacher/settings">Settings</Link></nav><button onClick={signOut}><LogOut size={14}/>Logout</button></div></div>{children}</>;
+  return <><div className="vx-teacherbar"><div className="vx-teacherbar-inner"><nav><Link href="/verifyx/teacher">Assignments</Link><Link href="/verifyx/teacher/question-bank">Question Bank</Link><Link href="/verifyx/teacher/students">Students</Link><Link href="/verifyx/teacher/results">Results</Link><Link href="/verifyx/teacher/settings">Settings</Link></nav><button onClick={signOut}><LogOut size={14}/>Logout</button></div></div>{children}</>;
 }
