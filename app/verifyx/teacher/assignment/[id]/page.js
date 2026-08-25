@@ -103,7 +103,6 @@ export default function AssignmentDetail(){
    not_started:studentRows.filter(x=>x.status==='not_started').length,
    in_progress:studentRows.filter(x=>x.status==='in_progress').length,
    final:studentRows.filter(x=>x.status==='final').length,
-   flagged:studentRows.reduce((n,x)=>n+Number(x.flagged_count||0),0),
    average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0
   };
  },[studentRows]);
@@ -146,10 +145,9 @@ export default function AssignmentDetail(){
     <div className="vx-result" style={{marginTop:0}}><small>กำลังทำ</small><div className="vx-score" style={{fontSize:24}}>{stats.in_progress}</div></div>
     <div className="vx-result" style={{marginTop:0}}><small>Final แล้ว</small><div className="vx-score" style={{fontSize:24}}>{stats.final}</div></div>
     <div className="vx-result" style={{marginTop:0}}><small>คะแนนเฉลี่ย Final</small><div className="vx-score" style={{fontSize:24}}>{stats.average}/100</div></div>
-    <div className="vx-result" style={{marginTop:0}}><small>ธงเหลืองค้าง</small><div className="vx-score" style={{fontSize:24}}>{stats.flagged}</div></div>
    </div>
    <div className="vx-form" style={{marginTop:16}}><div className="vx-form-row"><label>ค้นหานักเรียน<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="ชื่อหรือรหัสนักเรียน"/></label><label>สถานะ<select value={studentStatus} onChange={e=>setStudentStatus(e.target.value)}><option value="all">ทั้งหมด</option><option value="not_started">ยังไม่เริ่ม</option><option value="in_progress">กำลังทำ</option><option value="final">Final แล้ว</option></select></label></div></div>
-   <div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}</p><div className="vx-tags">{s.status==='in_progress'&&<><span>เริ่ม {s.started_at?new Date(s.started_at).toLocaleString('th-TH'):'—'}</span><span>{s.flagged_count} ธงเหลือง</span></>}{s.status==='final'&&<><span>คะแนน {s.final_score??0}/100</span><span>Final {s.final_at?new Date(s.final_at).toLocaleString('th-TH'):'—'}</span></>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนตามตัวกรอง</div>}</div>
+   <div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}</p><div className="vx-tags">{s.status==='in_progress'&&<><span>เริ่ม {s.started_at?new Date(s.started_at).toLocaleString('th-TH'):'—'}</span>{s.flagged_count>0&&<span>🟨 มีข้อที่มาร์กไว้ {s.flagged_count}</span>}</>}{s.status==='final'&&<><span>คะแนน {s.final_score??0}/100</span><span>Final {s.final_at?new Date(s.final_at).toLocaleString('th-TH'):'—'}</span></>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนตามตัวกรอง</div>}</div>
   </section>
 
   <section className="vx-card"><div className="vx-top" style={{marginBottom:12}}><div><p className="vx-kicker">RULE</p><h3>กติกาการบ้าน</h3><p>Assignment นี้ดึงโจทย์จาก Question Bank อัตโนมัติ ไม่ต้องเพิ่มโจทย์ทีละข้อ</p></div><span className="vx-status">Final ครั้งเดียว</span></div>
