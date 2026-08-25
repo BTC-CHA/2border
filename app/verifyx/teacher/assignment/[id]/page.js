@@ -116,8 +116,11 @@ export default function AssignmentDetail(){
   });
  },[studentRows,studentSearch,studentStatus]);
 
+ const hasStarted=progress.length>0;
+
  async function saveRules(e){
   e.preventDefault();setError('');setMessage('');
+  if(hasStarted){setError('Assignment นี้มีนักเรียนเริ่มทำแล้ว กติกาหลักจึงถูกล็อก');return;}
   const fd=new FormData(e.currentTarget);
   const difficulty=String(fd.get('difficulty'));
   const questionCount=Number(fd.get('questionCount'));
@@ -150,8 +153,9 @@ export default function AssignmentDetail(){
    <div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}</p><div className="vx-tags">{s.status==='in_progress'&&<><span>เริ่ม {s.started_at?new Date(s.started_at).toLocaleString('th-TH'):'—'}</span>{s.flagged_count>0&&<span>🟨 มีข้อที่มาร์กไว้ {s.flagged_count}</span>}</>}{s.status==='final'&&<><span>คะแนน {s.final_score??0}/100</span><span>Final {s.final_at?new Date(s.final_at).toLocaleString('th-TH'):'—'}</span></>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนตามตัวกรอง</div>}</div>
   </section>
 
-  <section className="vx-card"><div className="vx-top" style={{marginBottom:12}}><div><p className="vx-kicker">RULE</p><h3>กติกาการบ้าน</h3><p>Assignment นี้ดึงโจทย์จาก Question Bank อัตโนมัติ ไม่ต้องเพิ่มโจทย์ทีละข้อ</p></div><span className="vx-status">Final ครั้งเดียว</span></div>
-   <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>หมวด<select disabled defaultValue="part_modeling"><option value="part_modeling">Part Modeling</option></select></label><label>ระดับ<select name="difficulty" defaultValue={assignment.difficulty||'basic'}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>จำนวนข้อ<input name="questionCount" type="number" min="1" defaultValue={assignment.question_count||1} required/></label><label><span><input name="randomize" type="checkbox" defaultChecked={assignment.randomize_questions!==false}/> สุ่มโจทย์ให้นักเรียน</span></label></div><button className="vx-btn primary">บันทึกกติกา</button></form>
+  <section className="vx-card"><div className="vx-top" style={{marginBottom:12}}><div><p className="vx-kicker">RULE</p><h3>กติกาการบ้าน</h3><p>{hasStarted?'มีนักเรียนเริ่ม Assignment แล้ว กติกาหลักถูกล็อกเพื่อให้ทุกคนใช้เงื่อนไขเดียวกัน':'Assignment นี้ดึงโจทย์จาก Question Bank อัตโนมัติ ไม่ต้องเพิ่มโจทย์ทีละข้อ'}</p></div><span className="vx-status">{hasStarted?'Rules Locked':'Final ครั้งเดียว'}</span></div>
+   {hasStarted&&<div className="vx-empty" style={{marginBottom:12}}>🔒 ล็อกแล้ว: หมวด / ระดับ / จำนวนข้อ / การสุ่ม แก้ไม่ได้หลังมีนักเรียนเริ่มทำ แต่ยังเปิด–ปิดรับงานได้จากหน้า Assignment</div>}
+   <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>หมวด<select disabled defaultValue="part_modeling"><option value="part_modeling">Part Modeling</option></select></label><label>ระดับ<select name="difficulty" disabled={hasStarted} defaultValue={assignment.difficulty||'basic'}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>จำนวนข้อ<input name="questionCount" type="number" min="1" disabled={hasStarted} defaultValue={assignment.question_count||1} required/></label><label><span><input name="randomize" type="checkbox" disabled={hasStarted} defaultChecked={assignment.randomize_questions!==false}/> สุ่มโจทย์ให้นักเรียน</span></label></div><button className="vx-btn primary" disabled={hasStarted}>{hasStarted?'กติกาถูกล็อกแล้ว':'บันทึกกติกา'}</button></form>
   </section>
 
   <section className="vx-card" style={{marginTop:14}}><div className="vx-top" style={{marginBottom:10}}><div><p className="vx-kicker">BANK READINESS</p><h3>ความพร้อมของคลังโจทย์</h3></div><button className="vx-file" onClick={load}><RefreshCw size={14}/>เช็กใหม่</button></div>
