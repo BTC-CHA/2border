@@ -27,7 +27,23 @@ export default function TeacherLayout({ children }) {
     try{setPending(JSON.parse(localStorage.getItem(PENDING_KEY)||'null'))}catch{setPending(null)}
     setLoading(false);
   }
-  useEffect(()=>{refresh();const {data:{subscription}}=vx.auth.onAuthStateChange((_e,s)=>refresh(s));return()=>subscription.unsubscribe()},[]);
+
+  async function revalidateAccess(){
+    const s=(await vx.auth.getSession()).data.session;
+    if(!s){setSession(null);setIsTeacher(false);return}
+    const {data,error}=await vx.rpc('vx_me_is_teacher');
+    if(error||!data){setSession(s);setIsTeacher(false);if(error)setError(error.message)}
+  }
+
+  useEffect(()=>{
+    refresh();
+    const {data:{subscription}}=vx.auth.onAuthStateChange((_e,s)=>refresh(s));
+    const onFocus=()=>revalidateAccess();
+    const onVisible=()=>{if(document.visibilityState==='visible')revalidateAccess()};
+    window.addEventListener('focus',onFocus);
+    document.addEventListener('visibilitychange',onVisible);
+    return()=>{subscription.unsubscribe();window.removeEventListener('focus',onFocus);document.removeEventListener('visibilitychange',onVisible)};
+  },[]);
 
   async function signIn(e){e.preventDefault();setError('');setMessage('');const fd=new FormData(e.currentTarget);const {error}=await vx.auth.signInWithPassword({email:String(fd.get('email')).trim(),password:String(fd.get('password'))});if(error)setError(error.message)}
 
@@ -64,7 +80,7 @@ export default function TeacherLayout({ children }) {
       {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}<Link className="vx-file" href="/verifyx">กลับหน้า VerifyX</Link></section></div></main>;
   }
 
-  if(!isTeacher){const p=pending||{displayName:'',schoolName:'',schoolCode:''};return <main className="vx-page"><div className="vx-wrap"><section className="vx-card vx-login"><ShieldCheck size={30}/><p className="vx-kicker" style={{marginTop:14}}>FINISH SETUP</p><h2>{pending?'ตั้งค่าโรงเรียนให้เสร็จ':'ยังไม่มีสิทธิ์ Teacher'}</h2>{pending?<><p>บัญชียืนยันแล้ว เหลือสร้างพื้นที่โรงเรียนของคุณ</p><form className="vx-form" onSubmit={finishOnboarding}><label>ชื่อครู<input name="displayName" defaultValue={p.displayName} required/></label><label>ชื่อโรงเรียน / สถาบัน<input name="schoolName" defaultValue={p.schoolName} required/></label><label>School Code<input name="schoolCode" defaultValue={p.schoolCode} maxLength={24} required/></label><button className="vx-btn primary"><School size={16}/>สร้างโรงเรียนและเข้า Teacher Mode</button></form></>:<p>ไม่พบคำเชิญสำหรับอีเมลนี้ หากเป็นครูในโรงเรียนเดิมให้ Owner เชิญอีเมลนี้ก่อน</p>}{error&&<div className="vx-error">{error}</div>}<button className="vx-btn secondary" style={{marginTop:10,width:'100%'}} onClick={signOut}>ออกจากระบบ</button></section></div></main>}
+  if(!isTeacher){const p=pending||{displayName:'',schoolName:'',schoolCode:''};return <main className="vx-page"><div className="vx-wrap"><section className="vx-card vx-login"><ShieldCheck size={30}/><p className="vx-kicker" style={{marginTop:14}}>FINISH SETUP</p><h2>{pending?'ตั้งค่าโรงเรียนให้เสร็จ':'ไม่มีสิทธิ์ Teacher แล้ว'}</h2>{pending?<><p>บัญชียืนยันแล้ว เหลือสร้างพื้นที่โรงเรียนของคุณ</p><form className="vx-form" onSubmit={finishOnboarding}><label>ชื่อครู<input name="displayName" defaultValue={p.displayName} required/></label><label>ชื่อโรงเรียน / สถาบัน<input name="schoolName" defaultValue={p.schoolName} required/></label><label>School Code<input name="schoolCode" defaultValue={p.schoolCode} maxLength={24} required/></label><button className="vx-btn primary"><School size={16}/>สร้างโรงเรียนและเข้า Teacher Mode</button></form></>:<p>บัญชีนี้ไม่ได้อยู่ใน Teacher Team ปัจจุบัน หากต้องการเข้าร่วมอีกครั้งให้ Owner เชิญอีเมลนี้ใหม่</p>}{error&&<div className="vx-error">{error}</div>}<button className="vx-btn secondary" style={{marginTop:10,width:'100%'}} onClick={signOut}>ออกจากระบบ</button></section></div></main>}
 
   return <><div className="vx-teacherbar"><div className="vx-teacherbar-inner"><nav><Link href="/verifyx/teacher">Assignments</Link><Link href="/verifyx/teacher/question-bank">Question Bank</Link><Link href="/verifyx/teacher/students">Students</Link><Link href="/verifyx/teacher/results">Results</Link><Link href="/verifyx/teacher/settings">Settings</Link></nav><button onClick={signOut}><LogOut size={14}/>Logout</button></div></div>{children}</>;
 }
