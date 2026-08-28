@@ -1,4 +1,5 @@
 import './verifyx.css';
+import './verifyx-round2.css';
 
 export const metadata = {
   title: 'VerifyX | 2BOrder',
