@@ -1,14 +1,27 @@
 'use client';
 
 import {useEffect,useMemo,useState} from 'react';
+import {Upload} from 'lucide-react';
 import {vx} from '../../vxClient';
 import TeacherNav from '../TeacherNav';
 
 const statusMeta={not_started:{label:'ยังไม่เริ่ม',cls:'vx-progress muted'},in_progress:{label:'กำลังทำ',cls:'vx-progress working'},final:{label:'Final แล้ว',cls:'vx-progress final'}};
 
+function splitCsvLine(line,delimiter=','){
+ const out=[];let cur='',quoted=false;
+ for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){out.push(cur.trim());cur=''}else cur+=ch}out.push(cur.trim());return out
+}
+function parseRoster(text){
+ const lines=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!lines.length)return [];
+ const delimiter=lines[0].includes('\t')?'\t':',';const first=splitCsvLine(lines[0],delimiter).map(x=>x.toLowerCase().replace(/\s+/g,'_'));
+ const aliases={student_code:['student_code','code','studentid','student_id','รหัสนักเรียน'],full_name:['full_name','name','student_name','ชื่อ','ชื่อ_นามสกุล'],email:['email','e-mail','อีเมล'],section_code:['section_code','section','class','ห้อง','รหัสห้อง']};
+ const idx=k=>first.findIndex(x=>aliases[k].includes(x));const hasHeader=idx('student_code')>=0&&idx('full_name')>=0&&idx('email')>=0;const start=hasHeader?1:0;
+ return lines.slice(start).map(line=>{const c=splitCsvLine(line,delimiter);return {student_code:c[hasHeader?idx('student_code'):0]||'',full_name:c[hasHeader?idx('full_name'):1]||'',email:c[hasHeader?idx('email'):2]||'',section_code:c[hasHeader?idx('section_code'):3]||''}}).filter(x=>x.student_code||x.full_name||x.email)
+}
+
 export default function StudentsPage(){
  const [rows,setRows]=useState([]),[assignments,setAssignments]=useState([]),[progress,setProgress]=useState([]),[finalRows,setFinalRows]=useState([]),[structure,setStructure]=useState([]),[assignmentSections,setAssignmentSections]=useState({});
- const [selected,setSelected]=useState(null),[showAdd,setShowAdd]=useState(false),[search,setSearch]=useState(''),[statusFilter,setStatusFilter]=useState('all'),[sectionFilter,setSectionFilter]=useState('all'),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
+ const [selected,setSelected]=useState(null),[showAdd,setShowAdd]=useState(false),[showBulk,setShowBulk]=useState(false),[bulkText,setBulkText]=useState(''),[bulkReport,setBulkReport]=useState(null),[search,setSearch]=useState(''),[statusFilter,setStatusFilter]=useState('all'),[sectionFilter,setSectionFilter]=useState('all'),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const sections=useMemo(()=>Array.from(new Map(structure.filter(x=>x.section_id).map(x=>[String(x.section_id),{id:x.section_id,code:x.section_code,name:x.section_name,departmentName:x.department_name}])).values()),[structure]);
  const sectionMap=useMemo(()=>Object.fromEntries(sections.map(s=>[String(s.id),s])),[sections]);
 
@@ -17,18 +30,20 @@ export default function StudentsPage(){
   const [{data:students,error:se},{data:as,error:ae},{data:pr,error:pe},{data:fr,error:fe},{data:st,error:ste},{data:maps,error:me}]=await Promise.all([
    vx.from('vx_students').select('student_id:id,student_code,full_name,email,auth_user_id,claimed_at,section_id').order('student_code'),
    vx.from('vx_assignments').select('id,title,status,difficulty,question_count,course,assignment_type,cad_question_count,mcq_question_count').order('created_at',{ascending:false}),
-   vx.from('vx_student_assignment_progress').select('*'),
-   vx.rpc('vx_teacher_final_results_v2'),
-   vx.rpc('vx_teacher_academic_structure'),
-   vx.from('vx_assignment_sections').select('assignment_id,section_id')
+   vx.from('vx_student_assignment_progress').select('*'),vx.rpc('vx_teacher_final_results_v2'),vx.rpc('vx_teacher_academic_structure'),vx.from('vx_assignment_sections').select('assignment_id,section_id')
   ]);
-  const err=se||ae||pe||fe||ste||me;if(err)setError(err.message);
-  setRows(students||[]);setAssignments(as||[]);setProgress(pr||[]);setFinalRows(fr||[]);setStructure(st||[]);
+  const err=se||ae||pe||fe||ste||me;if(err)setError(err.message);setRows(students||[]);setAssignments(as||[]);setProgress(pr||[]);setFinalRows(fr||[]);setStructure(st||[]);
   const by={};(maps||[]).forEach(x=>{const k=String(x.assignment_id);if(!by[k])by[k]=[];by[k].push(String(x.section_id))});setAssignmentSections(by);setLoading(false)
  }
  useEffect(()=>{load()},[]);
 
  async function addStudent(e){e.preventDefault();if(saving)return;setSaving(true);setError('');setMessage('');const form=e.currentTarget,fd=new FormData(form),rawSection=String(fd.get('section')||'');const {error}=await vx.rpc('vx_teacher_upsert_student',{p_student_code:String(fd.get('code')).trim(),p_full_name:String(fd.get('name')).trim(),p_email:String(fd.get('email')).trim().toLowerCase(),p_section_id:rawSection?Number(rawSection):null});setSaving(false);if(error)return setError(error.message);form.reset();setShowAdd(false);setMessage('บันทึกรายชื่อนักเรียนแล้ว');await load()}
+ async function importBulk(){
+  if(saving)return;setError('');setMessage('');setBulkReport(null);const parsed=parseRoster(bulkText);if(!parsed.length)return setError('ไม่พบข้อมูลสำหรับนำเข้า');
+  setSaving(true);const {data,error}=await vx.rpc('vx_teacher_import_students',{p_rows:parsed});setSaving(false);if(error)return setError(error.message);const r=data?.[0]||{processed:0,saved:0,failed:0,errors:[]};setBulkReport(r);setMessage(`Bulk Import: บันทึก ${r.saved}/${r.processed} คน${r.failed?` · ผิดพลาด ${r.failed} แถว`:''}`);if(!r.failed)setBulkText('');await load()
+ }
+ async function readCsv(e){const file=e.target.files?.[0];if(!file)return;try{setBulkText(await file.text());setBulkReport(null)}catch(err){setError(err.message)}e.target.value=''}
+
  const progressMap=useMemo(()=>Object.fromEntries(progress.map(p=>[`${p.student_id}:${p.assignment_id}`,p])),[progress]);
  const statusFor=(sid,aid)=>progressMap[`${sid}:${aid}`]?.status||'not_started';
  const assignmentApplies=(a,s)=>{const target=assignmentSections[String(a.id)]||[];return !target.length||(s.section_id!=null&&target.includes(String(s.section_id)))};
@@ -37,8 +52,11 @@ export default function StudentsPage(){
  const finalAgg=useMemo(()=>{const map={};finalRows.forEach(r=>{const k=`${r.student_id}:${r.assignment_id}`;if(!map[k])map[k]={scores:[],cad:[],mcq:[],final_at:r.submitted_at||null};const sc=Number(r.score||0);map[k].scores.push(sc);if(r.question_type==='cad')map[k].cad.push(sc);if(r.question_type==='mcq')map[k].mcq.push(sc)});Object.values(map).forEach(x=>{x.avg=x.scores.length?Math.round(x.scores.reduce((a,b)=>a+b,0)/x.scores.length):0;x.cadAvg=x.cad.length?Math.round(x.cad.reduce((a,b)=>a+b,0)/x.cad.length):null;x.mcqAvg=x.mcq.length?Math.round(x.mcq.reduce((a,b)=>a+b,0)/x.mcq.length):null});return map},[finalRows]);
 
  return <main className="vx-page"><div className="vx-wrap"><TeacherNav active="students"/>
-  <div className="vx-top"><div><p className="vx-kicker">TEACHER MODE</p><h1>Students</h1><p>Roster · Section · Email Verification · สถานะ Assignment</p></div><button className="vx-btn primary" onClick={()=>setShowAdd(v=>!v)}>{showAdd?'ปิดฟอร์ม':'เพิ่มนักเรียน'}</button></div>
+  <div className="vx-top"><div><p className="vx-kicker">TEACHER MODE</p><h1>Students</h1><p>Roster · Section · Email Verification · สถานะ Assignment</p></div><div className="vx-toolbar"><button className="vx-btn secondary" onClick={()=>{setShowBulk(v=>!v);setShowAdd(false)}}><Upload size={15}/>Bulk Import</button><button className="vx-btn primary" onClick={()=>{setShowAdd(v=>!v);setShowBulk(false)}}>{showAdd?'ปิดฟอร์ม':'เพิ่มนักเรียน'}</button></div></div>
   {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
+
+  {showBulk&&<section className="vx-card" style={{marginBottom:16}}><p className="vx-kicker">BULK ROSTER</p><h2>นำเข้ารายชื่อนักเรียน</h2><p>วางจาก Excel/Google Sheets ได้เลย หรือเลือก CSV · คอลัมน์: <b>student_code, full_name, email, section_code</b></p><div className="vx-toolbar" style={{marginBottom:10}}><label className="vx-btn secondary" style={{cursor:'pointer'}}>เลือกไฟล์ CSV<input type="file" accept=".csv,text/csv,text/plain" onChange={readCsv} style={{display:'none'}}/></label><span className="vx-progress muted">สูงสุด 1000 คน/ครั้ง</span></div><textarea rows="9" value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={'student_code,full_name,email,section_code\n65001,สมชาย ใจดี,somchai@example.com,SEC A\n65002,สมหญิง เรียนดี,somying@example.com,SEC A'} style={{width:'100%'}}/><div className="vx-tags" style={{marginTop:8}}><span>ตรวจพบ {parseRoster(bulkText).length} แถว</span><span>Section Code ต้องตรงกับ School Profile</span></div><button className="vx-btn primary" style={{marginTop:12}} disabled={saving||!parseRoster(bulkText).length} onClick={importBulk}>{saving?'กำลังนำเข้า...':'นำเข้ารายชื่อทั้งหมด'}</button>{bulkReport?.failed>0&&<div className="vx-error" style={{marginTop:12}}><b>แถวที่ต้องแก้</b><div className="vx-list" style={{marginTop:8}}>{(bulkReport.errors||[]).slice(0,30).map((x,i)=><div className="vx-item" key={i}><span>แถว {x.row} · {x.student_code||'—'}</span><span>{x.error}</span></div>)}</div>{bulkReport.failed>30&&<small>แสดง 30 รายการแรกจาก {bulkReport.failed}</small>}</div>}</section>}
+
   {showAdd&&<section className="vx-card" style={{marginBottom:16}}><p className="vx-kicker">STUDENT ROSTER</p><h2>เพิ่ม / อัปเดตรายชื่อนักเรียน</h2><p>Email ต้องตรงกับบัญชีที่นักเรียนจะใช้สมัคร VerifyX</p><form className="vx-form" onSubmit={addStudent}><div className="vx-form-row"><label>รหัสนักเรียน<input name="code" required/></label><label>Section<select name="section" defaultValue="" required={sections.length>0}><option value="">{sections.length?'เลือก Section':'ยังไม่มี Section'}</option>{sections.map(s=><option key={s.id} value={s.id}>{s.departmentName} · {s.name} ({s.code})</option>)}</select></label></div><label>ชื่อ - นามสกุล<input name="name" required/></label><label>Email นักเรียน<input name="email" type="email" required/></label><button className="vx-btn primary" disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกรายชื่อ'}</button></form></section>}
 
   <div className="vx-grid vx-student-stats" style={{marginBottom:16}}><div className="vx-card"><small>Students</small><h2>{rows.length}</h2></div><div className="vx-card"><small>ยืนยันบัญชีแล้ว</small><h2>{rows.filter(r=>r.auth_user_id).length}</h2></div><div className="vx-card"><small>รอยืนยัน</small><h2>{rows.filter(r=>!r.auth_user_id).length}</h2></div></div>
