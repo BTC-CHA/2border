@@ -6,24 +6,31 @@ import TeacherNav from '../TeacherNav';
 import {vx} from '../../vxClient';
 
 export default function SchoolProfile(){
- const [school,setSchool]=useState(null),[team,setTeam]=useState([]),[invites,setInvites]=useState([]),[structure,setStructure]=useState([]),[userId,setUserId]=useState(null),[editing,setEditing]=useState(false),[name,setName]=useState(''),[code,setCode]=useState(''),[inviteName,setInviteName]=useState(''),[inviteEmail,setInviteEmail]=useState(''),[saving,setSaving]=useState(false),[inviting,setInviting]=useState(false),[busy,setBusy]=useState(''),[message,setMessage]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[showDepartment,setShowDepartment]=useState(false),[sectionDepartment,setSectionDepartment]=useState(null);
+ const [school,setSchool]=useState(null),[team,setTeam]=useState([]),[invites,setInvites]=useState([]),[structure,setStructure]=useState([]),[teacherSections,setTeacherSections]=useState([]),[userId,setUserId]=useState(null),[editing,setEditing]=useState(false),[name,setName]=useState(''),[code,setCode]=useState(''),[inviteName,setInviteName]=useState(''),[inviteEmail,setInviteEmail]=useState(''),[saving,setSaving]=useState(false),[inviting,setInviting]=useState(false),[busy,setBusy]=useState(''),[message,setMessage]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[showDepartment,setShowDepartment]=useState(false),[sectionDepartment,setSectionDepartment]=useState(null),[editingTeacher,setEditingTeacher]=useState(null),[sectionDraft,setSectionDraft]=useState([]);
  const me=useMemo(()=>team.find(x=>x.user_id===userId)||null,[team,userId]);
  const isOwner=me?.role==='owner';
  const departments=useMemo(()=>{
   const map=new Map();
   for(const r of structure){
    if(!map.has(r.department_id))map.set(r.department_id,{id:r.department_id,code:r.department_code,name:r.department_name,is_active:r.department_active,sections:[]});
-   if(r.section_id)map.get(r.department_id).sections.push({id:r.section_id,code:r.section_code,name:r.section_name,academic_year:r.academic_year,term:r.term,is_active:r.section_active});
+   if(r.section_id)map.get(r.department_id).sections.push({id:r.section_id,code:r.section_code,name:r.section_name,academic_year:r.academic_year,term:r.term,is_active:r.section_active,department_id:r.department_id,department_name:r.department_name});
   }
   return [...map.values()];
  },[structure]);
+ const allSections=useMemo(()=>departments.flatMap(d=>d.sections.map(s=>({...s,department_name:d.name,department_code:d.code}))).filter(s=>s.is_active),[departments]);
+ const sectionMap=useMemo(()=>Object.fromEntries(allSections.map(s=>[String(s.id),s])),[allSections]);
+ const teacherSectionMap=useMemo(()=>{
+  const map={};
+  for(const x of teacherSections){const k=x.teacher_user_id;(map[k]??=[]).push(Number(x.section_id))}
+  return map;
+ },[teacherSections]);
  async function load(){
   setLoading(true);setError('');
-  const [{data:i,error:ie},{data:t,error:te},{data:iv,error:ive},{data:u,error:ue},{data:st,error:ste}]=await Promise.all([
-   vx.rpc('vx_teacher_institution'),vx.rpc('vx_teacher_team'),vx.rpc('vx_teacher_invites_list'),vx.auth.getUser(),vx.rpc('vx_teacher_academic_structure')
+  const [{data:i,error:ie},{data:t,error:te},{data:iv,error:ive},{data:u,error:ue},{data:st,error:ste},{data:ts,error:tse}]=await Promise.all([
+   vx.rpc('vx_teacher_institution'),vx.rpc('vx_teacher_team'),vx.rpc('vx_teacher_invites_list'),vx.auth.getUser(),vx.rpc('vx_teacher_academic_structure'),vx.rpc('vx_teacher_section_map')
   ]);
-  const err=ie||te||ive||ue||ste;if(err)setError(err.message);
-  const s=i?.[0]||null;setSchool(s);setName(s?.name||'');setCode(s?.code||'');setTeam(t||[]);setInvites(iv||[]);setStructure(st||[]);setUserId(u?.user?.id||null);setLoading(false)
+  const err=ie||te||ive||ue||ste||tse;if(err)setError(err.message);
+  const s=i?.[0]||null;setSchool(s);setName(s?.name||'');setCode(s?.code||'');setTeam(t||[]);setInvites(iv||[]);setStructure(st||[]);setTeacherSections(ts||[]);setUserId(u?.user?.id||null);setLoading(false)
  }
  useEffect(()=>{load()},[]);
  async function save(e){e.preventDefault();if(!isOwner||saving)return;setSaving(true);setError('');setMessage('');const {data,error}=await vx.rpc('vx_update_teacher_institution',{p_name:name,p_code:code});setSaving(false);if(error){setError(error.message);return}const s=data?.[0]||null;setSchool(s);setName(s?.name||'');setCode(s?.code||'');setEditing(false);setMessage('บันทึกข้อมูลโรงเรียนแล้ว')}
@@ -33,6 +40,14 @@ export default function SchoolProfile(){
  async function revoke(i){if(!confirm(`ยกเลิกคำเชิญ ${i.email} ?`))return;setBusy(`i-${i.id}`);const {error}=await vx.rpc('vx_revoke_teacher_invite',{p_invite_id:i.id});setBusy('');if(error)return setError(error.message);setMessage('ยกเลิกคำเชิญแล้ว');await load()}
  async function remove(t){if(!confirm(`นำ ${t.display_name} ออกจากทีมครู?`))return;setBusy(`r-${t.user_id}`);const {error}=await vx.rpc('vx_remove_teacher',{p_user_id:t.user_id});setBusy('');if(error)return setError(error.message);setMessage('นำครูออกจากทีมแล้ว');await load()}
  async function transfer(t){if(!confirm(`โอน Owner ให้ ${t.display_name} ?`))return;if(!confirm('ยืนยันอีกครั้ง: หลังโอนคุณจะกลายเป็น Teacher'))return;setBusy(`o-${t.user_id}`);const {error}=await vx.rpc('vx_transfer_owner',{p_new_owner_user_id:t.user_id});setBusy('');if(error)return setError(error.message);setMessage('โอน Owner เรียบร้อยแล้ว');await load()}
+ function beginTeacherSections(t){setEditingTeacher(t.user_id);setSectionDraft([...(teacherSectionMap[t.user_id]||[])]);setError('');setMessage('')}
+ function toggleTeacherSection(id){setSectionDraft(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id])}
+ async function saveTeacherSections(t){
+  if(!isOwner)return; if(!sectionDraft.length){setError('กรุณาเลือกอย่างน้อย 1 Section');return}
+  setBusy(`ts-${t.user_id}`);setError('');setMessage('');
+  const {error}=await vx.rpc('vx_set_teacher_sections',{p_teacher_user_id:t.user_id,p_section_ids:sectionDraft});
+  setBusy('');if(error)return setError(error.message);setEditingTeacher(null);setMessage(`กำหนด Section ให้ ${t.display_name} แล้ว`);await load()
+ }
  return <main className="vx-page"><div className="vx-wrap"><TeacherNav active="school"/>
   <div className="vx-top"><div><p className="vx-kicker">TEACHER MODE</p><h1>School Profile</h1><p>ข้อมูลโรงเรียน โครงสร้างการเรียน และ Teacher Team</p></div></div>
   {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
@@ -47,7 +62,7 @@ export default function SchoolProfile(){
      </div></article>)}</div>:<div className="vx-empty"><School size={18}/>ยังไม่มี Department · เริ่มจากสร้าง Department แล้วค่อยเพิ่ม Section</div>}
    </section>
 
-   <section className="vx-card"><p className="vx-kicker">TEACHER TEAM</p><h2>ครูในโรงเรียน</h2><div className="vx-list">{team.map(t=><div className="vx-item" key={t.user_id}><div><h3>{t.display_name}</h3><p>{t.user_id===userId?'บัญชีของคุณ':''}</p></div><div className="vx-toolbar"><span className={`vx-progress ${t.role==='owner'?'working':'muted'}`}>{t.role==='owner'?'Owner':'Teacher'}</span>{isOwner&&t.role==='teacher'&&t.user_id!==userId&&<><button className="vx-link secondary" disabled={busy!==''} onClick={()=>transfer(t)}>{busy===`o-${t.user_id}`?'กำลังโอน...':'โอน Owner'}</button><button className="vx-link secondary" disabled={busy!==''} onClick={()=>remove(t)}>{busy===`r-${t.user_id}`?'กำลังนำออก...':'นำออก'}</button></>}</div></div>)}</div>{isOwner&&<form className="vx-form" onSubmit={invite} style={{marginTop:18}}><h3>เชิญครูเพิ่ม</h3><label>ชื่อครู (ถ้าทราบ)<input value={inviteName} onChange={e=>setInviteName(e.target.value)}/></label><label>Email<input value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} type="email" required/></label><button className="vx-btn primary" disabled={inviting}>{inviting?'กำลังบันทึก...':'เชิญครูด้วย Email'}</button></form>}{isOwner&&invites.length>0&&<div style={{marginTop:18}}><h3>คำเชิญ</h3><div className="vx-list">{invites.map(i=><div className="vx-item" key={i.id}><div><b>{i.email}</b><p>{i.display_name||'—'} · {i.status}</p></div>{i.status==='pending'&&<button className="vx-link secondary" disabled={busy!==''} onClick={()=>revoke(i)}>{busy===`i-${i.id}`?'กำลังยกเลิก...':'ยกเลิก Invite'}</button>}</div>)}</div></div>}</section>
+   <section className="vx-card"><p className="vx-kicker">TEACHER TEAM</p><h2>ครูในโรงเรียน</h2><p>Owner สามารถกำหนด Section ที่ครูแต่ละคนรับผิดชอบได้หลาย Section</p><div className="vx-list">{team.map(t=>{const assigned=teacherSectionMap[t.user_id]||[];const editingSections=editingTeacher===t.user_id;return <div className="vx-item" key={t.user_id} style={{alignItems:'stretch'}}><div style={{width:'100%'}}><div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}><div><h3>{t.display_name}</h3><p>{t.user_id===userId?'บัญชีของคุณ':''}</p><div className="vx-tags">{assigned.length?assigned.map(id=><span key={id}>{sectionMap[String(id)]?.department_code||'—'} · {sectionMap[String(id)]?.code||id}</span>):<span>ยังไม่กำหนด Section · Legacy ทั้งโรงเรียน</span>}</div></div><div className="vx-toolbar"><span className={`vx-progress ${t.role==='owner'?'working':'muted'}`}>{t.role==='owner'?'Owner':'Teacher'}</span>{isOwner&&allSections.length>0&&<button className="vx-link secondary" disabled={busy!==''} onClick={()=>editingSections?setEditingTeacher(null):beginTeacherSections(t)}>{editingSections?'ยกเลิก Section':'จัด Section'}</button>}{isOwner&&t.role==='teacher'&&t.user_id!==userId&&<><button className="vx-link secondary" disabled={busy!==''} onClick={()=>transfer(t)}>{busy===`o-${t.user_id}`?'กำลังโอน...':'โอน Owner'}</button><button className="vx-link secondary" disabled={busy!==''} onClick={()=>remove(t)}>{busy===`r-${t.user_id}`?'กำลังนำออก...':'นำออก'}</button></>}</div></div>{editingSections&&<div className="vx-card" style={{marginTop:12,padding:14}}><p style={{marginTop:0}}>เลือก Section ที่ <b>{t.display_name}</b> ดูแล</p><div className="vx-list">{departments.map(d=><div key={d.id}><b>{d.code} · {d.name}</b><div className="vx-tags" style={{marginTop:8}}>{d.sections.filter(s=>s.is_active).map(s=><label key={s.id} className="vx-file" style={{cursor:'pointer'}}><input type="checkbox" checked={sectionDraft.includes(Number(s.id))} onChange={()=>toggleTeacherSection(Number(s.id))}/><span>{s.code} · {s.name}</span></label>)}</div></div>)}</div><div className="vx-toolbar" style={{marginTop:12}}><button className="vx-btn secondary" type="button" onClick={()=>setEditingTeacher(null)}>ยกเลิก</button><button className="vx-btn primary" type="button" disabled={busy===`ts-${t.user_id}`||!sectionDraft.length} onClick={()=>saveTeacherSections(t)}>{busy===`ts-${t.user_id}`?'กำลังบันทึก...':`บันทึก ${sectionDraft.length} Section`}</button></div></div>}</div></div>})}</div>{isOwner&&<form className="vx-form" onSubmit={invite} style={{marginTop:18}}><h3>เชิญครูเพิ่ม</h3><label>ชื่อครู (ถ้าทราบ)<input value={inviteName} onChange={e=>setInviteName(e.target.value)}/></label><label>Email<input value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} type="email" required/></label><button className="vx-btn primary" disabled={inviting}>{inviting?'กำลังบันทึก...':'เชิญครูด้วย Email'}</button></form>}{isOwner&&invites.length>0&&<div style={{marginTop:18}}><h3>คำเชิญ</h3><div className="vx-list">{invites.map(i=><div className="vx-item" key={i.id}><div><b>{i.email}</b><p>{i.display_name||'—'} · {i.status}</p></div>{i.status==='pending'&&<button className="vx-link secondary" disabled={busy!==''} onClick={()=>revoke(i)}>{busy===`i-${i.id}`?'กำลังยกเลิก...':'ยกเลิก Invite'}</button>}</div>)}</div></div>}</section>
   </>}
  </div></main>;
 }
