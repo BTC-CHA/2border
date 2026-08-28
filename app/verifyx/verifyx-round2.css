@@ -1,0 +1,71 @@
+/* VerifyX UI polish round 2: desktop proportions + consistent controls */
+@media (min-width: 901px){
+  .vx-wrap{width:min(1240px,calc(100% - 48px));}
+  .vx-teacherbar-inner{width:min(1240px,calc(100% - 48px));}
+  .vx-page{padding-top:24px;}
+  .vx-top{margin-bottom:18px;}
+  .vx-card{padding:17px 18px;}
+  .vx-grid{gap:12px;}
+  .vx-list{gap:10px;}
+  .vx-card>.vx-btn,.vx-card>.vx-link{width:auto;}
+  .vx-card>.vx-btn.secondary,.vx-card>.vx-btn.primary{min-width:150px;}
+}
+
+/* Header actions should look like actions, not full-width bars */
+.vx-top>.vx-toolbar{width:auto;max-width:560px;display:flex;justify-content:flex-end;gap:8px;}
+.vx-top>.vx-toolbar .vx-btn,.vx-top>.vx-toolbar .vx-link{width:auto;min-width:0;padding-inline:14px;}
+
+/* Form controls outside .vx-form (Question Bank filters / inline editors) */
+.vx-card .vx-form-row label{display:grid;gap:6px;min-width:0;font-size:11px;font-weight:800;color:#4b382e;}
+.vx-card .vx-form-row input:not([type="checkbox"]):not([type="radio"]),
+.vx-card .vx-form-row select,
+.vx-card .vx-form-row textarea{width:100%;min-width:0;box-sizing:border-box;border:1px solid #ead4c7;background:#fffaf7;color:#4b382e;border-radius:11px;padding:10px 11px;font:inherit;font-size:13px;}
+.vx-card .vx-form-row select{min-height:40px;}
+
+/* Question Bank: compact, balanced filter area */
+.vx-page .vx-card>.vx-form-row{align-items:end;}
+.vx-page .vx-card>.vx-form-row+ .vx-form-row{margin-top:8px!important;}
+.vx-page .vx-card>.vx-form-row label>input,
+.vx-page .vx-card>.vx-form-row label>select{margin-top:0;}
+
+/* Stats should be informative, not oversized */
+.vx-student-stats .vx-card,.vx-history-stats .vx-card,.vx-result-stats .vx-card{padding:15px 16px;min-height:88px;display:flex;flex-direction:column;justify-content:center;}
+.vx-student-stats h2,.vx-history-stats h2,.vx-result-stats h2{font-size:24px;line-height:1;margin-top:5px;}
+
+/* Results: keep filters compact and summary row readable */
+.vx-result-stats{grid-template-columns:repeat(3,minmax(0,1fr));}
+.vx-result-stats+.vx-card{padding:16px 18px;}
+.vx-result-stats+.vx-card .vx-form{gap:9px;}
+.vx-result-stats+.vx-card .vx-toolbar{margin-top:2px;}
+
+/* Student roster cards */
+.vx-student-card{padding:14px 16px;}
+.vx-student-head{align-items:center;}
+.vx-student-card .vx-tags{margin-top:7px;}
+
+/* School profile: nested structure should not stretch actions */
+.vx-card .vx-item .vx-link,.vx-card .vx-item .vx-btn{width:auto;}
+.vx-card .vx-item{align-items:center;}
+.vx-card .vx-item>div{min-width:0;}
+
+/* Assignment cards stay broad enough to scan but compact vertically */
+.vx-assignment-card{padding:16px 17px 13px;}
+.vx-assignment-footer{margin-top:11px;padding-top:10px;}
+.vx-assignment-meta{margin-top:8px;}
+
+@media (min-width: 1200px){
+  .vx-top h1{font-size:30px;}
+  .vx-form-row{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+
+@media (max-width: 900px){
+  .vx-wrap{width:100%;}
+  .vx-top>.vx-toolbar{width:100%;max-width:none;justify-content:flex-start;}
+}
+
+@media (max-width: 700px){
+  .vx-top>.vx-toolbar .vx-btn,.vx-top>.vx-toolbar .vx-link{width:100%;}
+  .vx-card>.vx-btn,.vx-card>.vx-link{width:100%;}
+  .vx-result-stats{grid-template-columns:1fr;}
+  .vx-card .vx-item{align-items:flex-start;}
+}
