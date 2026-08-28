@@ -48,17 +48,31 @@ export default function AssignmentDetail(){
  const stats=useMemo(()=>{const scores=studentRows.filter(x=>x.final_score!==null).map(x=>Number(x.final_score));return {total:studentRows.length,not_started:studentRows.filter(x=>x.status==='not_started').length,in_progress:studentRows.filter(x=>x.status==='in_progress').length,final:studentRows.filter(x=>x.status==='final').length,average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0}},[studentRows]);
  const total=Number(cadCount||0)+Number(mcqCount||0);
  async function poolInfo(){const {data,error}=await vx.rpc('vx_teacher_assignment_pool_info_v2',{p_difficulty:difficulty,p_subject:subject||'SolidWorks',p_category_code:''});if(error)throw error;const x=data?.[0]||{};return {cad:Number(x.cad_family_count||0),mcq:Number(x.mcq_question_count||0)}}
+ async function validateReadiness(){
+  if(total<1)throw new Error('Assignment ต้องมีอย่างน้อย 1 ข้อ');
+  if(sections.length>0&&selectedSections.length===0)throw new Error('กรุณาเลือกอย่างน้อย 1 Section');
+  const pool=await poolInfo();
+  if(cadCount>pool.cad)throw new Error(`CAD Bank พร้อมใช้ ${pool.cad} Family แต่ Assignment ต้องการ ${cadCount} ข้อ · เพิ่ม Drawing PDF/เปิดใช้ Variant ให้เพียงพอก่อน`);
+  if(mcqCount>pool.mcq)throw new Error(`MCQ Bank พร้อมใช้ ${pool.mcq} ข้อ แต่ Assignment ต้องการ ${mcqCount} ข้อ`);
+  return pool;
+ }
  async function saveRules(e){
   e.preventDefault();if(hasStarted||saving)return;setSaving(true);setError('');setMessage('');
   try{
-   if(total<1)throw new Error('กรุณากำหนดจำนวนข้ออย่างน้อย 1 ข้อ');if(sections.length>0&&selectedSections.length===0)throw new Error('กรุณาเลือกอย่างน้อย 1 Section');
-   const pool=await poolInfo();if(cadCount>pool.cad)throw new Error(`CAD Bank มี ${pool.cad} Family แต่ต้องการ ${cadCount} ข้อ`);if(mcqCount>pool.mcq)throw new Error(`MCQ Bank มี ${pool.mcq} ข้อ แต่ต้องการ ${mcqCount} ข้อ`);
+   await validateReadiness();
    const type=deriveType(cadCount,mcqCount);const {error}=await vx.from('vx_assignments').update({difficulty,question_count:total,assignment_type:type,question_category:type==='mcq'?'mcq':'part_modeling',cad_question_count:cadCount,mcq_question_count:mcqCount,mcq_subject:subject||'SolidWorks',randomize_questions:randomize,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)throw error;
    if(sections.length>0){const {error:mapErr}=await vx.rpc('vx_teacher_set_assignment_sections',{p_assignment_id:assignmentId,p_section_ids:selectedSections});if(mapErr)throw mapErr}
    setMessage('บันทึกกติกา Assignment แล้ว');await load();
   }catch(err){setError(err.message)}finally{setSaving(false)}
  }
- async function setStatus(status){setError('');setMessage('');const {error}=await vx.from('vx_assignments').update({status,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)return setError(error.message);setMessage(`เปลี่ยนสถานะเป็น ${statusLabel[status]} แล้ว`);await load()}
+ async function setStatus(status){
+  if(saving)return;setSaving(true);setError('');setMessage('');
+  try{
+   if(status==='open')await validateReadiness();
+   const {error}=await vx.from('vx_assignments').update({status,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)throw error;
+   setMessage(`เปลี่ยนสถานะเป็น ${statusLabel[status]} แล้ว`);await load();
+  }catch(err){setError(err.message)}finally{setSaving(false)}
+ }
  function toggleSection(id){setSelectedSections(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id])}
  if(loading)return <main className="vx-page"><div className="vx-wrap"><div className="vx-empty">กำลังโหลด Assignment...</div></div></main>;
  if(!assignment)return <main className="vx-page"><div className="vx-wrap"><div className="vx-error">ไม่พบ Assignment หรือคุณไม่มีสิทธิ์เข้าถึง</div></div></main>;
@@ -70,7 +84,7 @@ export default function AssignmentDetail(){
    <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>Difficulty<select value={difficulty} disabled={hasStarted} onChange={e=>setDifficulty(e.target.value)}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label><label>Subject สำหรับปรนัย<input value={subject} disabled={hasStarted} onChange={e=>setSubject(e.target.value)}/></label></div><div className="vx-form-row"><label>CAD / Mass Properties<input type="number" min="0" value={cadCount} disabled={hasStarted} onChange={e=>setCadCount(Math.max(0,Number(e.target.value)||0))}/></label><label>ปรนัย<input type="number" min="0" value={mcqCount} disabled={hasStarted} onChange={e=>setMcqCount(Math.max(0,Number(e.target.value)||0))}/></label></div><div className="vx-tags"><span>CAD {cadCount}</span><span>ปรนัย {mcqCount}</span><span><b>รวม {total} ข้อ</b></span></div>
    {sections.length>0&&<div><p className="vx-kicker" style={{marginTop:12}}>TARGET SECTION</p><div className="vx-list">{sections.map(s=><label key={s.id} className="vx-card" style={{padding:11,display:'flex',gap:9,alignItems:'center',cursor:hasStarted?'default':'pointer'}}><input type="checkbox" checked={selectedSections.includes(s.id)} disabled={hasStarted} onChange={()=>toggleSection(s.id)}/><span><b>{s.department} · {s.name}</b> <small>({s.code})</small></span></label>)}</div></div>}
    <label className="vx-checkline"><input type="checkbox" checked={randomize} disabled={hasStarted} onChange={e=>setRandomize(e.target.checked)}/><span>สุ่มโจทย์และสลับตัวเลือกปรนัย</span></label><button className="vx-btn primary" disabled={hasStarted||saving||total<1}>{saving?'กำลังตรวจคลัง...':'บันทึกกติกา'}</button></form>
-   <div className="vx-toolbar" style={{marginTop:12}}>{assignment.status!=='open'&&<button className="vx-link secondary" onClick={()=>setStatus('open')}>เปิดรับงาน</button>}{assignment.status==='open'&&<button className="vx-link secondary" onClick={()=>setStatus('closed')}>ปิดรับงาน</button>}</div>
+   <div className="vx-toolbar" style={{marginTop:12}}>{assignment.status!=='open'&&<button className="vx-link secondary" disabled={saving} onClick={()=>setStatus('open')}>เปิดรับงาน</button>}{assignment.status==='open'&&<button className="vx-link secondary" disabled={saving} onClick={()=>setStatus('closed')}>ปิดรับงาน</button>}</div>
   </section>
   <section className="vx-card"><div className="vx-top"><div><p className="vx-kicker">STUDENTS</p><h2>นักเรียนใน Assignment นี้</h2><p>แสดงเฉพาะนักเรียนใน Section เป้าหมาย</p></div><UsersRound size={22}/></div><div className="vx-form"><div className="vx-form-row"><label>ค้นหา<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="ชื่อหรือรหัสนักเรียน"/></label><label>สถานะ<select value={studentStatus} onChange={e=>setStudentStatus(e.target.value)}><option value="all">ทั้งหมด</option><option value="not_started">ยังไม่เริ่ม</option><option value="in_progress">กำลังทำ</option><option value="final">Final แล้ว</option></select></label></div></div><div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}{s.section_id?` · ${sectionMap[Number(s.section_id)]?.name||'Section'}`:''}</p><div className="vx-tags">{s.status==='in_progress'&&s.flagged_count>0&&<span>🟨 มาร์กไว้ {s.flagged_count}</span>}{s.status==='final'&&<><span>รวม {s.final_score??0}/100</span>{s.cad_score!==null&&<span>CAD {s.cad_score}</span>}{s.mcq_score!==null&&<span>ปรนัย {s.mcq_score}</span>}</>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนในกลุ่มเป้าหมาย</div>}</div></section>
  </div></main>;
