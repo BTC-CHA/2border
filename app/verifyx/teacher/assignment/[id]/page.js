@@ -1,170 +1,94 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import {useEffect,useMemo,useState} from 'react';
+import {useParams} from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Boxes, CheckCircle2, CircleAlert, RefreshCw } from 'lucide-react';
-import { vx } from '../../../vxClient';
+import {ArrowLeft,Boxes,RefreshCw,LockKeyhole,UsersRound} from 'lucide-react';
+import {vx} from '../../../vxClient';
 import TeacherNav from '../../TeacherNav';
 
 const diffLabel={basic:'Basic',pro:'Pro',advanced:'Advanced'};
 const statusLabel={draft:'ฉบับร่าง',open:'เปิดรับงาน',closed:'ปิดรับงาน'};
-const progressMeta={
- not_started:{label:'ยังไม่เริ่ม',cls:'vx-progress muted'},
- in_progress:{label:'กำลังทำ',cls:'vx-progress working'},
- final:{label:'Final แล้ว',cls:'vx-progress final'}
-};
+const typeLabel={cad:'CAD / Engineering',mcq:'Multiple Choice',short_answer:'เติมคำ',mixed:'Mixed'};
+const progressMeta={not_started:{label:'ยังไม่เริ่ม',cls:'vx-progress muted'},in_progress:{label:'กำลังทำ',cls:'vx-progress working'},final:{label:'Final แล้ว',cls:'vx-progress final'}};
+const deriveType=(cad,mcq,short)=>{const n=[cad>0,mcq>0,short>0].filter(Boolean).length;if(n>1)return 'mixed';if(cad>0)return 'cad';if(mcq>0)return 'mcq';if(short>0)return 'short_answer';return 'mixed'};
 
 export default function AssignmentDetail(){
  const {id}=useParams();
  const assignmentId=Number(id);
- const [assignment,setAssignment]=useState(null);
- const [families,setFamilies]=useState([]);
- const [bank,setBank]=useState([]);
- const [students,setStudents]=useState([]);
- const [progress,setProgress]=useState([]);
- const [finalRows,setFinalRows]=useState([]);
- const [studentSearch,setStudentSearch]=useState('');
- const [studentStatus,setStudentStatus]=useState('all');
- const [loading,setLoading]=useState(true);
- const [error,setError]=useState('');
- const [message,setMessage]=useState('');
+ const [assignment,setAssignment]=useState(null),[students,setStudents]=useState([]),[progress,setProgress]=useState([]),[finalRows,setFinalRows]=useState([]),[sections,setSections]=useState([]),[targetSections,setTargetSections]=useState([]),[team,setTeam]=useState([]);
+ const [difficulty,setDifficulty]=useState('basic'),[cadCount,setCadCount]=useState(0),[mcqCount,setMcqCount]=useState(0),[shortCount,setShortCount]=useState(0),[subject,setSubject]=useState('SolidWorks'),[randomize,setRandomize]=useState(true),[selectedSections,setSelectedSections]=useState([]);
+ const [studentSearch,setStudentSearch]=useState(''),[studentStatus,setStudentStatus]=useState('all'),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
 
  async function load(){
   setLoading(true);setError('');
-  const [{data:a,error:ae},{data:f,error:fe},{data:q,error:qe},{data:st,error:se},{data:pr,error:pe},{data:fr,error:fre}]=await Promise.all([
+  const [{data:a,error:ae},{data:st,error:se},{data:pr,error:pe},{data:fr,error:fre},{data:structure,error:ste},{data:maps,error:me},{data:t,error:te}]=await Promise.all([
    vx.from('vx_assignments').select('*').eq('id',assignmentId).single(),
-   vx.from('vx_question_families').select('*').eq('is_active',true),
-   vx.from('vx_question_bank').select('*').eq('is_active',true),
    vx.rpc('vx_teacher_students'),
    vx.from('vx_student_assignment_progress').select('*').eq('assignment_id',assignmentId),
-   vx.rpc('vx_teacher_final_results')
+   vx.rpc('vx_teacher_final_results_v2'),
+   vx.rpc('vx_teacher_academic_structure'),
+   vx.from('vx_assignment_sections').select('section_id').eq('assignment_id',assignmentId),
+   vx.rpc('vx_teacher_team')
   ]);
-  const err=ae||fe||qe||se||pe||fre;
-  if(err)setError(err.message);
-  setAssignment(a||null);
-  setFamilies(f||[]);
-  setBank(q||[]);
-  setStudents(st||[]);
-  setProgress(pr||[]);
+  const err=ae||se||pe||fre||ste||me||te;if(err)setError(err.message);
+  const asg=a||null;setAssignment(asg);setProgress(pr||[]);setTeam(t||[]);
   setFinalRows((fr||[]).filter(r=>Number(r.assignment_id)===assignmentId));
-  setLoading(false);
+  const ss=Array.from(new Map((structure||[]).filter(x=>x.section_id&&x.section_active).map(x=>[Number(x.section_id),{id:Number(x.section_id),code:x.section_code,name:x.section_name,department:x.department_name,year:x.academic_year,term:x.term}])).values());
+  setSections(ss);
+  const target=(maps||[]).map(x=>Number(x.section_id));setTargetSections(target);setSelectedSections(target);
+  const visibleStudents=(st||[]).filter(s=>!target.length||target.includes(Number(s.section_id)));
+  setStudents(visibleStudents);
+  if(asg){setDifficulty(asg.difficulty||'basic');setCadCount(Number(asg.cad_question_count||0));setMcqCount(Number(asg.mcq_question_count||0));setShortCount(Number(asg.short_answer_question_count||0));setSubject(asg.mcq_subject||'SolidWorks');setRandomize(asg.randomize_questions!==false)}
+  setLoading(false)
  }
  useEffect(()=>{if(assignmentId)load()},[assignmentId]);
 
- const eligibleFamilies=useMemo(()=>{
-  if(!assignment)return [];
-  const ids=new Set(bank.map(q=>q.family_id));
-  return families.filter(f=>f.category===assignment.question_category&&f.difficulty===assignment.difficulty&&ids.has(f.id));
- },[assignment,families,bank]);
-
- const eligibleVariants=useMemo(()=>{
-  const ids=new Set(eligibleFamilies.map(f=>f.id));
-  return bank.filter(q=>ids.has(q.family_id));
- },[eligibleFamilies,bank]);
-
- const familyRows=useMemo(()=>eligibleFamilies.map(f=>({
-  ...f,
-  variants:eligibleVariants.filter(q=>q.family_id===f.id)
- })),[eligibleFamilies,eligibleVariants]);
-
- const ready=assignment ? eligibleFamilies.length>=Number(assignment.question_count||0) : false;
- const missing=assignment ? Math.max(0,Number(assignment.question_count||0)-eligibleFamilies.length) : 0;
-
- const progressMap=useMemo(()=>Object.fromEntries(progress.map(p=>[String(p.student_id),p])),[progress]);
- const finalAgg=useMemo(()=>{
-  const map={};
-  finalRows.forEach(r=>{
-   const key=String(r.student_id);
-   if(!map[key])map[key]={scores:[],final_at:r.submitted_at||r.final_at||null};
-   map[key].scores.push(Number(r.score||0));
-  });
-  Object.values(map).forEach(x=>{x.avg=x.scores.length?Math.round(x.scores.reduce((a,b)=>a+b,0)/x.scores.length):0});
-  return map;
- },[finalRows]);
-
- const studentRows=useMemo(()=>students.map(s=>{
-  const p=progressMap[String(s.student_id)];
-  const f=finalAgg[String(s.student_id)];
-  return {
-   ...s,
-   status:p?.status||'not_started',
-   flagged_count:p?.flagged_count||0,
-   started_at:p?.started_at||null,
-   final_at:p?.final_at||f?.final_at||null,
-   final_score:f?.avg??null
-  };
- }),[students,progressMap,finalAgg]);
-
- const stats=useMemo(()=>{
-  const scores=studentRows.filter(x=>x.final_score!==null).map(x=>Number(x.final_score));
-  return {
-   total:studentRows.length,
-   not_started:studentRows.filter(x=>x.status==='not_started').length,
-   in_progress:studentRows.filter(x=>x.status==='in_progress').length,
-   final:studentRows.filter(x=>x.status==='final').length,
-   average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0
-  };
- },[studentRows]);
-
- const visibleStudents=useMemo(()=>{
-  const q=studentSearch.trim().toLowerCase();
-  return studentRows.filter(s=>{
-   const statusOk=studentStatus==='all'||s.status===studentStatus;
-   const qOk=!q||`${s.full_name} ${s.student_code}`.toLowerCase().includes(q);
-   return statusOk&&qOk;
-  });
- },[studentRows,studentSearch,studentStatus]);
-
  const hasStarted=progress.length>0;
+ const owner=useMemo(()=>team.find(x=>x.user_id===assignment?.created_by)||null,[team,assignment]);
+ const sectionMap=useMemo(()=>Object.fromEntries(sections.map(s=>[s.id,s])),[sections]);
+ const progressMap=useMemo(()=>Object.fromEntries(progress.map(p=>[String(p.student_id),p])),[progress]);
+ const finalAgg=useMemo(()=>{const m={};finalRows.forEach(r=>{const k=String(r.student_id);if(!m[k])m[k]={scores:[],types:{cad:[],mcq:[],short_answer:[]},final_at:r.submitted_at};const sc=Number(r.score||0);m[k].scores.push(sc);if(m[k].types[r.question_type])m[k].types[r.question_type].push(sc)});Object.values(m).forEach(x=>{x.avg=x.scores.length?Math.round(x.scores.reduce((a,b)=>a+b,0)/x.scores.length):0;for(const k of Object.keys(x.types)){const z=x.types[k];x[`${k}_avg`]=z.length?Math.round(z.reduce((a,b)=>a+b,0)/z.length):null}});return m},[finalRows]);
+ const studentRows=useMemo(()=>students.map(s=>{const p=progressMap[String(s.student_id)],f=finalAgg[String(s.student_id)];return {...s,status:p?.status||'not_started',flagged_count:p?.flagged_count||0,started_at:p?.started_at||null,final_at:p?.final_at||f?.final_at||null,final_score:f?.avg??null,cad_score:f?.cad_avg??null,mcq_score:f?.mcq_avg??null,short_score:f?.short_answer_avg??null}}),[students,progressMap,finalAgg]);
+ const visibleStudents=useMemo(()=>{const q=studentSearch.toLowerCase().trim();return studentRows.filter(s=>(studentStatus==='all'||s.status===studentStatus)&&(!q||`${s.full_name} ${s.student_code}`.toLowerCase().includes(q)))},[studentRows,studentSearch,studentStatus]);
+ const stats=useMemo(()=>{const scores=studentRows.filter(x=>x.final_score!==null).map(x=>Number(x.final_score));return {total:studentRows.length,not_started:studentRows.filter(x=>x.status==='not_started').length,in_progress:studentRows.filter(x=>x.status==='in_progress').length,final:studentRows.filter(x=>x.status==='final').length,average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0}},[studentRows]);
+ const total=Number(cadCount||0)+Number(mcqCount||0)+Number(shortCount||0);
 
+ async function poolInfo(){const {data,error}=await vx.rpc('vx_teacher_assignment_pool_info_v2',{p_difficulty:difficulty,p_subject:subject||'SolidWorks',p_category_code:''});if(error)throw error;const x=data?.[0]||{};return {cad:Number(x.cad_family_count||0),mcq:Number(x.mcq_question_count||0),short:Number(x.short_answer_question_count||0)}}
  async function saveRules(e){
-  e.preventDefault();setError('');setMessage('');
-  if(hasStarted){setError('Assignment นี้มีนักเรียนเริ่มทำแล้ว กติกาหลักจึงถูกล็อก');return;}
-  const fd=new FormData(e.currentTarget);
-  const difficulty=String(fd.get('difficulty'));
-  const questionCount=Number(fd.get('questionCount'));
-  const randomize=fd.get('randomize')==='on';
-  const familyIds=new Set(bank.map(q=>q.family_id));
-  const available=families.filter(f=>f.is_active&&f.category==='part_modeling'&&f.difficulty===difficulty&&familyIds.has(f.id)).length;
-  if(questionCount>available){setError(`ระดับ ${diffLabel[difficulty]} มี Family พร้อมใช้ ${available} กลุ่ม แต่ต้องการ ${questionCount} ข้อ`);return;}
-  const {error}=await vx.from('vx_assignments').update({difficulty,question_count:questionCount,randomize_questions:randomize,updated_at:new Date().toISOString()}).eq('id',assignmentId);
-  if(error)return setError(error.message);
-  setMessage('บันทึกกติกา Assignment แล้ว');await load();
+  e.preventDefault();if(hasStarted||saving)return;setSaving(true);setError('');setMessage('');
+  try{
+   if(total<1)throw new Error('กรุณากำหนดจำนวนข้ออย่างน้อย 1 ข้อ');
+   if(sections.length>0&&selectedSections.length===0)throw new Error('กรุณาเลือกอย่างน้อย 1 Section');
+   const pool=await poolInfo();
+   if(cadCount>pool.cad)throw new Error(`CAD Bank มี ${pool.cad} Family แต่ต้องการ ${cadCount} ข้อ`);
+   if(mcqCount>pool.mcq)throw new Error(`MCQ Bank มี ${pool.mcq} ข้อ แต่ต้องการ ${mcqCount} ข้อ`);
+   if(shortCount>pool.short)throw new Error(`คลังเติมคำมี ${pool.short} ข้อ แต่ต้องการ ${shortCount} ข้อ`);
+   const type=deriveType(cadCount,mcqCount,shortCount);
+   const {error}=await vx.from('vx_assignments').update({difficulty,question_count:total,assignment_type:type,question_category:type==='cad'?'part_modeling':type,cad_question_count:cadCount,mcq_question_count:mcqCount,short_answer_question_count:shortCount,mcq_subject:subject||'SolidWorks',randomize_questions:randomize,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)throw error;
+   if(sections.length>0){const {error:mapErr}=await vx.rpc('vx_teacher_set_assignment_sections',{p_assignment_id:assignmentId,p_section_ids:selectedSections});if(mapErr)throw mapErr}
+   setMessage('บันทึกกติกา Assignment แล้ว');await load();
+  }catch(err){setError(err.message)}finally{setSaving(false)}
  }
+ async function setStatus(status){setError('');setMessage('');const {error}=await vx.from('vx_assignments').update({status,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)return setError(error.message);setMessage(`เปลี่ยนสถานะเป็น ${statusLabel[status]} แล้ว`);await load()}
+ function toggleSection(id){setSelectedSections(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id])}
 
- if(loading||!assignment)return <main className="vx-page"><div className="vx-wrap"><div className="vx-empty">กำลังโหลด Assignment...</div></div></main>;
+ if(loading)return <main className="vx-page"><div className="vx-wrap"><div className="vx-empty">กำลังโหลด Assignment...</div></div></main>;
+ if(!assignment)return <main className="vx-page"><div className="vx-wrap"><div className="vx-error">ไม่พบ Assignment หรือคุณไม่มีสิทธิ์เข้าถึง</div></div></main>;
 
- return <main className="vx-page"><div className="vx-wrap">
-  <TeacherNav active="assignments"/>
-  <header className="vx-top"><div><Link className="vx-file" href="/verifyx/teacher"><ArrowLeft size={15}/>Assignments</Link><p className="vx-kicker" style={{marginTop:14}}>ASSIGNMENT</p><h1>{assignment.title}</h1><p>{assignment.course||'ไม่ระบุวิชา'} · {statusLabel[assignment.status]||assignment.status}</p></div><div className="vx-toolbar"><button className="vx-btn secondary" onClick={load}><RefreshCw size={15}/>Refresh</button><Link className="vx-btn secondary" href="/verifyx/teacher/question-bank"><Boxes size={15}/>Question Bank</Link></div></header>
-
+ return <main className="vx-page"><div className="vx-wrap"><TeacherNav active="assignments"/>
+  <header className="vx-top"><div><Link className="vx-file" href="/verifyx/teacher"><ArrowLeft size={15}/>Assignments</Link><p className="vx-kicker" style={{marginTop:14}}>ASSIGNMENT DETAIL</p><h1>{assignment.title}</h1><p>{assignment.course||'ไม่ระบุวิชา'} · {statusLabel[assignment.status]||assignment.status}</p><div className="vx-tags"><span>{typeLabel[assignment.assignment_type]||assignment.assignment_type}</span><span>{diffLabel[assignment.difficulty]}</span><span>ครู {owner?.display_name||'—'}</span>{targetSections.length?targetSections.map(x=><span key={x}>Section {sectionMap[x]?.name||x}</span>):<span>Legacy · ทั้งโรงเรียน</span>}</div></div><div className="vx-toolbar"><button className="vx-btn secondary" onClick={load}><RefreshCw size={15}/>Refresh</button><Link className="vx-btn secondary" href="/verifyx/teacher/question-bank"><Boxes size={15}/>Question Bank</Link></div></header>
   {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
 
-  <section className="vx-card" style={{marginBottom:14}}><p className="vx-kicker">OVERVIEW</p><h2>ภาพรวม Assignment</h2><p>สถานะนักเรียนและผล Final ของงานนี้</p>
-   <div className="vx-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',marginTop:14}}>
-    <div className="vx-result" style={{marginTop:0}}><small>นักเรียนทั้งหมด</small><div className="vx-score" style={{fontSize:24}}>{stats.total}</div></div>
-    <div className="vx-result" style={{marginTop:0}}><small>ยังไม่เริ่ม</small><div className="vx-score" style={{fontSize:24}}>{stats.not_started}</div></div>
-    <div className="vx-result" style={{marginTop:0}}><small>กำลังทำ</small><div className="vx-score" style={{fontSize:24}}>{stats.in_progress}</div></div>
-    <div className="vx-result" style={{marginTop:0}}><small>Final แล้ว</small><div className="vx-score" style={{fontSize:24}}>{stats.final}</div></div>
-    <div className="vx-result" style={{marginTop:0}}><small>คะแนนเฉลี่ย Final</small><div className="vx-score" style={{fontSize:24}}>{stats.average}/100</div></div>
-   </div>
-   <div className="vx-form" style={{marginTop:16}}><div className="vx-form-row"><label>ค้นหานักเรียน<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="ชื่อหรือรหัสนักเรียน"/></label><label>สถานะ<select value={studentStatus} onChange={e=>setStudentStatus(e.target.value)}><option value="all">ทั้งหมด</option><option value="not_started">ยังไม่เริ่ม</option><option value="in_progress">กำลังทำ</option><option value="final">Final แล้ว</option></select></label></div></div>
-   <div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}</p><div className="vx-tags">{s.status==='in_progress'&&<><span>เริ่ม {s.started_at?new Date(s.started_at).toLocaleString('th-TH'):'—'}</span>{s.flagged_count>0&&<span>🟨 มีข้อที่มาร์กไว้ {s.flagged_count}</span>}</>}{s.status==='final'&&<><span>คะแนน {s.final_score??0}/100</span><span>Final {s.final_at?new Date(s.final_at).toLocaleString('th-TH'):'—'}</span></>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนตามตัวกรอง</div>}</div>
+  <section className="vx-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',marginBottom:14}}><div className="vx-card"><small>นักเรียนเป้าหมาย</small><h2>{stats.total}</h2></div><div className="vx-card"><small>ยังไม่เริ่ม</small><h2>{stats.not_started}</h2></div><div className="vx-card"><small>กำลังทำ</small><h2>{stats.in_progress}</h2></div><div className="vx-card"><small>Final</small><h2>{stats.final}</h2></div><div className="vx-card"><small>คะแนนเฉลี่ย</small><h2>{stats.average}/100</h2></div></section>
+
+  <section className="vx-card" style={{marginBottom:14}}><div className="vx-top"><div><p className="vx-kicker">RULES</p><h2>กติกา Assignment</h2><p>{hasStarted?'มีนักเรียนเริ่มแล้ว กติกาและ Section ถูกล็อก':'แก้จำนวนโจทย์แต่ละชนิดและ Section ได้จนกว่าจะมีนักเรียนเริ่ม'}</p></div>{hasStarted?<span className="vx-progress working"><LockKeyhole size={13}/>Locked</span>:<span className="vx-progress final">Editable</span>}</div>
+   <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>Difficulty<select value={difficulty} disabled={hasStarted} onChange={e=>setDifficulty(e.target.value)}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label><label>Subject<input value={subject} disabled={hasStarted} onChange={e=>setSubject(e.target.value)}/></label></div><div className="vx-form-row"><label>CAD<input type="number" min="0" value={cadCount} disabled={hasStarted} onChange={e=>setCadCount(Math.max(0,Number(e.target.value)||0))}/></label><label>ปรนัย<input type="number" min="0" value={mcqCount} disabled={hasStarted} onChange={e=>setMcqCount(Math.max(0,Number(e.target.value)||0))}/></label><label>เติมคำ<input type="number" min="0" value={shortCount} disabled={hasStarted} onChange={e=>setShortCount(Math.max(0,Number(e.target.value)||0))}/></label></div><div className="vx-tags"><span>CAD {cadCount}</span><span>ปรนัย {mcqCount}</span><span>เติมคำ {shortCount}</span><span><b>รวม {total} ข้อ</b></span></div>
+   {sections.length>0&&<div><p className="vx-kicker" style={{marginTop:12}}>TARGET SECTION</p><div className="vx-list">{sections.map(s=><label key={s.id} className="vx-card" style={{padding:11,display:'flex',gap:9,alignItems:'center',cursor:hasStarted?'default':'pointer'}}><input type="checkbox" checked={selectedSections.includes(s.id)} disabled={hasStarted} onChange={()=>toggleSection(s.id)}/><span><b>{s.department} · {s.name}</b> <small>({s.code})</small></span></label>)}</div></div>}
+   <label className="vx-checkline"><input type="checkbox" checked={randomize} disabled={hasStarted} onChange={e=>setRandomize(e.target.checked)}/><span>สุ่มโจทย์และสลับตัวเลือกปรนัย</span></label><button className="vx-btn primary" disabled={hasStarted||saving||total<1}>{saving?'กำลังตรวจคลัง...':'บันทึกกติกา'}</button></form>
+   <div className="vx-toolbar" style={{marginTop:12}}>{assignment.status!=='open'&&<button className="vx-link secondary" onClick={()=>setStatus('open')}>เปิดรับงาน</button>}{assignment.status==='open'&&<button className="vx-link secondary" onClick={()=>setStatus('closed')}>ปิดรับงาน</button>}{assignment.status!=='draft'&&!hasStarted&&<button className="vx-link secondary" onClick={()=>setStatus('draft')}>กลับเป็นฉบับร่าง</button>}</div>
   </section>
 
-  <section className="vx-card"><div className="vx-top" style={{marginBottom:12}}><div><p className="vx-kicker">RULE</p><h3>กติกาการบ้าน</h3><p>{hasStarted?'มีนักเรียนเริ่ม Assignment แล้ว กติกาหลักถูกล็อกเพื่อให้ทุกคนใช้เงื่อนไขเดียวกัน':'Assignment นี้ดึงโจทย์จาก Question Bank อัตโนมัติ ไม่ต้องเพิ่มโจทย์ทีละข้อ'}</p></div><span className="vx-status">{hasStarted?'Rules Locked':'Final ครั้งเดียว'}</span></div>
-   {hasStarted&&<div className="vx-empty" style={{marginBottom:12}}>🔒 ล็อกแล้ว: หมวด / ระดับ / จำนวนข้อ / การสุ่ม แก้ไม่ได้หลังมีนักเรียนเริ่มทำ แต่ยังเปิด–ปิดรับงานได้จากหน้า Assignment</div>}
-   <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>หมวด<select disabled defaultValue="part_modeling"><option value="part_modeling">Part Modeling</option></select></label><label>ระดับ<select name="difficulty" disabled={hasStarted} defaultValue={assignment.difficulty||'basic'}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>จำนวนข้อ<input name="questionCount" type="number" min="1" disabled={hasStarted} defaultValue={assignment.question_count||1} required/></label><label><span><input name="randomize" type="checkbox" disabled={hasStarted} defaultChecked={assignment.randomize_questions!==false}/> สุ่มโจทย์ให้นักเรียน</span></label></div><button className="vx-btn primary" disabled={hasStarted}>{hasStarted?'กติกาถูกล็อกแล้ว':'บันทึกกติกา'}</button></form>
-  </section>
-
-  <section className="vx-card" style={{marginTop:14}}><div className="vx-top" style={{marginBottom:10}}><div><p className="vx-kicker">BANK READINESS</p><h3>ความพร้อมของคลังโจทย์</h3></div><button className="vx-file" onClick={load}><RefreshCw size={14}/>เช็กใหม่</button></div>
-   <div className={ready?'vx-success':'vx-error'} style={{marginTop:0,display:'flex',alignItems:'center',gap:8}}>{ready?<CheckCircle2 size={18}/>:<CircleAlert size={18}/>}<span>{ready?`พร้อมใช้งาน · ต้องการ ${assignment.question_count} ข้อ · มี ${eligibleFamilies.length} Family / ${eligibleVariants.length} Variant`:`ยังไม่พร้อม · ขาดอีก ${missing} Family สำหรับระดับ ${diffLabel[assignment.difficulty]}`}</span></div>
-   <div className="vx-tags"><span>หมวด Part Modeling</span><span>ระดับ {diffLabel[assignment.difficulty]}</span><span>{eligibleFamilies.length} Families</span><span>{eligibleVariants.length} Variants</span><span>{assignment.randomize_questions?'Random ON':'Random OFF'}</span></div>
-  </section>
-
-  <section className="vx-list"><div className="vx-top" style={{margin:'18px 0 0'}}><div><p className="vx-kicker">RANDOM POOL PREVIEW</p><h3>โจทย์ที่มีโอกาสถูกสุ่ม</h3><p>ระบบเลือกได้สูงสุด 1 Variant ต่อ Family สำหรับนักเรียนหนึ่งคน</p></div></div>
-   {familyRows.length?familyRows.map(f=><article className="vx-card" key={f.id}><div className="vx-top" style={{marginBottom:10}}><div><p className="vx-kicker">{f.code} · {diffLabel[f.difficulty]}</p><h3>{f.name}</h3><p>{f.description||'Part Modeling'}</p></div><span className="vx-status">{f.variants.length} variants</span></div><div className="vx-tags">{f.variants.map(v=><span key={v.id}>{v.variant_code} · {v.title}</span>)}</div></article>):<div className="vx-empty">ยังไม่มี Family ที่พร้อมใช้สำหรับระดับนี้ ไปเพิ่มหรือเปิดใช้โจทย์ใน Question Bank ก่อน</div>}
-  </section>
+  <section className="vx-card"><div className="vx-top"><div><p className="vx-kicker">STUDENTS</p><h2>นักเรียนใน Assignment นี้</h2><p>แสดงเฉพาะนักเรียนใน Section เป้าหมาย</p></div><UsersRound size={22}/></div><div className="vx-form"><div className="vx-form-row"><label>ค้นหา<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="ชื่อหรือรหัสนักเรียน"/></label><label>สถานะ<select value={studentStatus} onChange={e=>setStudentStatus(e.target.value)}><option value="all">ทั้งหมด</option><option value="not_started">ยังไม่เริ่ม</option><option value="in_progress">กำลังทำ</option><option value="final">Final แล้ว</option></select></label></div></div><div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}{s.section_id?` · ${sectionMap[Number(s.section_id)]?.name||'Section'}`:''}</p><div className="vx-tags">{s.status==='in_progress'&&s.flagged_count>0&&<span>🟨 มาร์กไว้ {s.flagged_count}</span>}{s.status==='final'&&<><span>รวม {s.final_score??0}/100</span>{s.cad_score!==null&&<span>CAD {s.cad_score}</span>}{s.mcq_score!==null&&<span>ปรนัย {s.mcq_score}</span>}{s.short_score!==null&&<span>เติมคำ {s.short_score}</span>}</>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนในกลุ่มเป้าหมาย</div>}</div></section>
  </div></main>;
 }
