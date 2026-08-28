@@ -29,6 +29,53 @@
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row) label>input,
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row) label>select{margin-top:0;}
 
+/* Question Bank cards: desktop 4-column board */
+@media (min-width: 1180px){
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:12px;
+    align-items:stretch;
+  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card{
+    margin:0;
+    padding:14px;
+    min-width:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-top{
+    margin-bottom:10px;
+  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-toolbar{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:7px;
+    margin-top:auto;
+  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-file{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-tags{
+    margin-top:8px;
+    gap:4px;
+  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-tags span{
+    font-size:8px;
+    padding:4px 6px;
+  }
+}
+
+@media (min-width: 901px) and (max-width:1179px){
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+}
+
 /* Stats should be informative, not oversized */
 .vx-student-stats .vx-card,.vx-history-stats .vx-card,.vx-result-stats .vx-card{padding:15px 16px;min-height:88px;display:flex;flex-direction:column;justify-content:center;}
 .vx-student-stats h2,.vx-history-stats h2,.vx-result-stats h2{font-size:24px;line-height:1;margin-top:5px;}
@@ -71,4 +118,5 @@
   .vx-result-stats{grid-template-columns:1fr;}
   .vx-card .vx-item{align-items:flex-start;}
   .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row){grid-template-columns:1fr;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){display:grid;grid-template-columns:1fr;}
 }
