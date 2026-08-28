@@ -10,117 +10,50 @@
   .vx-card>.vx-btn,.vx-card>.vx-link{width:auto;}
   .vx-card>.vx-btn.secondary,.vx-card>.vx-btn.primary{min-width:150px;}
 }
-
-/* Header actions should look like actions, not full-width bars */
 .vx-top>.vx-toolbar{width:auto;max-width:560px;display:flex;justify-content:flex-end;gap:8px;}
 .vx-top>.vx-toolbar .vx-btn,.vx-top>.vx-toolbar .vx-link{width:auto;min-width:0;padding-inline:14px;}
-
-/* Form controls outside .vx-form (Question Bank filters / inline editors) */
 .vx-card .vx-form-row label{display:grid;gap:6px;min-width:0;font-size:11px;font-weight:800;color:#4b382e;}
 .vx-card .vx-form-row input:not([type="checkbox"]):not([type="radio"]),
 .vx-card .vx-form-row select,
 .vx-card .vx-form-row textarea{width:100%;min-width:0;box-sizing:border-box;border:1px solid #ead4c7;background:#fffaf7;color:#4b382e;border-radius:11px;padding:10px 11px;font:inherit;font-size:13px;}
 .vx-card .vx-form-row select{min-height:40px;}
-
-/* Question Bank: four filters on one desktop row */
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row){display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px;align-items:end;}
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row) > .vx-form-row{display:contents;}
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row) > .vx-form-row + .vx-form-row{margin-top:0!important;}
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row) label>input,
 .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row) label>select{margin-top:0;}
-
-/* Question Bank cards: desktop 4-column board */
 @media (min-width: 1180px){
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){
-    display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:12px;
-    align-items:stretch;
-  }
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card{
-    margin:0;
-    padding:14px;
-    min-width:0;
-    height:100%;
-    display:flex;
-    flex-direction:column;
-  }
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-top{
-    margin-bottom:10px;
-  }
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-toolbar{
-    display:grid;
-    grid-template-columns:1fr;
-    gap:7px;
-    margin-top:auto;
-  }
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-file{
-    width:100%;
-    justify-content:flex-start;
-  }
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-tags{
-    margin-top:8px;
-    gap:4px;
-  }
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-tags span{
-    font-size:8px;
-    padding:4px 6px;
-  }
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card{margin:0;padding:14px;min-width:0;height:100%;display:flex;flex-direction:column;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-top{margin-bottom:10px;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-toolbar{display:grid;grid-template-columns:1fr;gap:7px;margin-top:auto;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-file{width:100%;justify-content:flex-start;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-tags{margin-top:8px;gap:4px;}
+  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card) > article.vx-card .vx-tags span{font-size:8px;padding:4px 6px;}
 }
-
-@media (min-width: 901px) and (max-width:1179px){
-  .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:12px;
-  }
-}
-
-/* Stats should be informative, not oversized */
+@media (min-width: 901px) and (max-width:1179px){.vx-page .vx-wrap > section.vx-list:has(> article.vx-card){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}}
 .vx-student-stats .vx-card,.vx-history-stats .vx-card,.vx-result-stats .vx-card{padding:15px 16px;min-height:88px;display:flex;flex-direction:column;justify-content:center;}
 .vx-student-stats h2,.vx-history-stats h2,.vx-result-stats h2{font-size:24px;line-height:1;margin-top:5px;}
-
-/* Results: keep filters compact and summary row readable */
 .vx-result-stats{grid-template-columns:repeat(3,minmax(0,1fr));}
 .vx-result-stats+.vx-card{padding:16px 18px;}
 .vx-result-stats+.vx-card .vx-form{gap:9px;}
 .vx-result-stats+.vx-card .vx-toolbar{margin-top:2px;}
-
-/* Student roster cards */
 .vx-student-card{padding:14px 16px;}
 .vx-student-head{align-items:center;}
 .vx-student-card .vx-tags{margin-top:7px;}
-
-/* School profile: nested structure should not stretch actions */
 .vx-card .vx-item .vx-link,.vx-card .vx-item .vx-btn{width:auto;}
 .vx-card .vx-item{align-items:center;}
 .vx-card .vx-item>div{min-width:0;}
-
-/* Assignment cards stay broad enough to scan but compact vertically */
 .vx-assignment-card{padding:16px 17px 13px;}
 .vx-assignment-footer{margin-top:11px;padding-top:10px;}
 .vx-assignment-meta{margin-top:8px;}
-
-/* Assignment create form: description should be compact, not dominate the page */
-.vx-create-panel .vx-form > label > textarea[name="description"]{
-  min-height:72px!important;
-  height:72px!important;
-  max-height:120px;
-  resize:vertical;
-}
-.vx-create-panel .vx-form{gap:9px;}
-
-@media (min-width: 1200px){
-  .vx-top h1{font-size:30px;}
-  .vx-form-row{grid-template-columns:repeat(2,minmax(0,1fr));}
-}
-
+.vx-create-panel textarea[name="description"]{height:72px;min-height:72px;max-height:140px;resize:vertical;}
+@media (min-width: 1200px){.vx-top h1{font-size:30px;}.vx-form-row{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media (max-width: 900px){
   .vx-wrap{width:100%;}
   .vx-top>.vx-toolbar{width:100%;max-width:none;justify-content:flex-start;}
   .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row){grid-template-columns:repeat(2,minmax(0,1fr));}
 }
-
 @media (max-width: 700px){
   .vx-top>.vx-toolbar .vx-btn,.vx-top>.vx-toolbar .vx-link{width:100%;}
   .vx-card>.vx-btn,.vx-card>.vx-link{width:100%;}
@@ -128,5 +61,63 @@
   .vx-card .vx-item{align-items:flex-start;}
   .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row){grid-template-columns:1fr;}
   .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){display:grid;grid-template-columns:1fr;}
-  .vx-create-panel .vx-form > label > textarea[name="description"]{height:64px!important;min-height:64px!important;}
+  .vx-create-panel textarea[name="description"]{height:64px;min-height:64px;}
+}
+
+/* Student exam: one question at a time */
+.vx-exam-wrap{max-width:920px!important;}
+.vx-exam-nav{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px;}
+.vx-exam-nav>div{display:grid;text-align:right;line-height:1.2;}
+.vx-exam-nav b{font-size:13px;color:#4b382e;}
+.vx-exam-nav small{font-size:10px;color:#9a8175;margin-top:3px;}
+.vx-exam-message{margin:0 0 10px;}
+.vx-exam-progress{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#ffc89f,#ffd7b9);padding:12px 16px;border-radius:18px 18px 8px 8px;color:#625248;}
+.vx-exam-progress strong{font-size:30px;line-height:1;letter-spacing:.02em;}
+.vx-exam-progress span{font-size:22px;font-weight:900;}
+.vx-exam-question{border-radius:8px 8px 20px 20px!important;padding:20px!important;margin-top:4px;}
+.vx-exam-question-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px;}
+.vx-exam-question-head h2{font-size:21px;line-height:1.28;margin:3px 0 0;}
+.vx-exam-tools{margin-bottom:14px;}
+.vx-exam-choices{display:grid;gap:9px;}
+.vx-exam-choice{display:grid;grid-template-columns:auto 34px 1fr;align-items:center;gap:10px;border:1px solid #efd8ca;background:#fffdfb;border-radius:15px;padding:13px 15px;cursor:pointer;transition:.15s ease;min-height:48px;}
+.vx-exam-choice:hover{background:#fff7f1;border-color:#eabf9f;}
+.vx-exam-choice.selected{background:#fff0e5;border-color:#ef9d69;box-shadow:0 0 0 2px rgba(239,157,105,.12);}
+.vx-exam-choice input{width:17px;height:17px;margin:0;}
+.vx-exam-choice b{font-size:14px;color:#6a4a39;}
+.vx-exam-choice span{font-size:14px;line-height:1.35;color:#4b382e;}
+.vx-exam-footer{display:grid;grid-template-columns:58px minmax(180px,1fr) 58px;gap:12px;align-items:center;margin-top:13px;}
+.vx-exam-arrow{width:58px;height:52px;border:1px solid #efd3c1;border-radius:13px;background:#fff7f1;color:#c66f3f;display:grid;place-items:center;cursor:pointer;}
+.vx-exam-arrow:disabled{opacity:.3;cursor:not-allowed;}
+.vx-exam-summary-btn{width:100%!important;min-height:52px!important;font-size:16px!important;background:#f4eee9!important;color:#43382f!important;}
+.vx-exam-summary{max-width:720px;margin:0 auto;padding:18px!important;}
+.vx-exam-summary-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.vx-exam-summary-head h2{margin:3px 0 0;}
+.vx-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
+.vx-summary-cell{border:1px solid #ead8cc;background:#fffaf6;border-radius:12px;min-height:62px;padding:8px;display:grid;place-items:center;gap:3px;cursor:pointer;}
+.vx-summary-cell b{font-size:12px;color:#5c463a;}
+.vx-summary-cell span{font-size:20px;font-weight:900;line-height:1;}
+.vx-summary-cell.answered{background:#eef8f1;border-color:#cfe8d7;color:#4d8a65;}
+.vx-summary-cell.flagged{background:#fff6cf;border-color:#ebd274;color:#9a7315;}
+.vx-summary-cell.unanswered{background:#fff1ef;border-color:#f0d0cb;color:#bd625c;}
+.vx-summary-legend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 10px;}
+.vx-summary-legend span{font-size:10px;padding:6px 9px;border-radius:999px;background:#fff4ec;color:#795c4d;}
+.vx-final-btn{width:100%!important;margin-top:10px;}
+@media(max-width:700px){
+ .vx-exam-wrap{max-width:none!important;}
+ .vx-exam-nav{align-items:flex-start;}
+ .vx-exam-nav>div{max-width:58%;}
+ .vx-exam-progress{padding:10px 12px;}
+ .vx-exam-progress strong{font-size:26px;}
+ .vx-exam-progress span{font-size:19px;}
+ .vx-exam-question{padding:14px!important;}
+ .vx-exam-question-head{flex-direction:column;gap:7px;}
+ .vx-exam-question-head h2{font-size:18px;}
+ .vx-exam-choice{grid-template-columns:auto 28px 1fr;padding:12px 11px;gap:7px;}
+ .vx-exam-choice span{font-size:13px;}
+ .vx-exam-footer{grid-template-columns:48px 1fr 48px;gap:8px;}
+ .vx-exam-arrow{width:48px;height:48px;}
+ .vx-exam-summary-btn{min-height:48px!important;font-size:14px!important;}
+ .vx-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;}
+ .vx-summary-cell{min-height:56px;padding:7px 4px;}
+ .vx-exam-summary-head{flex-direction:column;}
 }
