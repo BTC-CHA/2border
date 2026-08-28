@@ -101,6 +101,15 @@
 .vx-assignment-footer{margin-top:11px;padding-top:10px;}
 .vx-assignment-meta{margin-top:8px;}
 
+/* Assignment create form: description should be compact, not dominate the page */
+.vx-create-panel .vx-form > label > textarea[name="description"]{
+  min-height:72px!important;
+  height:72px!important;
+  max-height:120px;
+  resize:vertical;
+}
+.vx-create-panel .vx-form{gap:9px;}
+
 @media (min-width: 1200px){
   .vx-top h1{font-size:30px;}
   .vx-form-row{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -119,4 +128,5 @@
   .vx-card .vx-item{align-items:flex-start;}
   .vx-page .vx-wrap > section.vx-card:has(> .vx-form-row){grid-template-columns:1fr;}
   .vx-page .vx-wrap > section.vx-list:has(> article.vx-card){display:grid;grid-template-columns:1fr;}
+  .vx-create-panel .vx-form > label > textarea[name="description"]{height:64px!important;min-height:64px!important;}
 }
