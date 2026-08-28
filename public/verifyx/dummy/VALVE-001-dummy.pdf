@@ -1,0 +1,52 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 409 >>
+stream
+BT
+/F1 18 Tf
+72 740 Td
+(VerifyX Dummy Mechanical Drawing - VALVE-001) Tj
+/F1 10 Tf
+0 -24 Td
+(TEST FILE ONLY - replace with real drawing later) Tj
+ET
+1 w
+100 500 260 140 re S
+130 530 200 80 re S
+200 610 m 200 660 l 260 660 l 260 610 l S
+160 570 m 300 570 l S
+230 500 m 230 640 l S
+BT
+/F1 11 Tf
+110 480 Td
+(Dummy dimensions: 260 x 140 / internal 200 x 80) Tj
+0 -20 Td
+(For VerifyX workflow testing only.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000700 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+770
+%%EOF
