@@ -9,15 +9,14 @@ import TeacherNav from '../../TeacherNav';
 
 const diffLabel={basic:'Basic',pro:'Pro',advanced:'Advanced'};
 const statusLabel={draft:'ฉบับร่าง',open:'เปิดรับงาน',closed:'ปิดรับงาน'};
-const typeLabel={cad:'CAD / Engineering',mcq:'Multiple Choice',short_answer:'เติมคำ',mixed:'Mixed'};
+const typeLabel={cad:'CAD / Engineering',mcq:'Multiple Choice',mixed:'CAD + Multiple Choice'};
 const progressMeta={not_started:{label:'ยังไม่เริ่ม',cls:'vx-progress muted'},in_progress:{label:'กำลังทำ',cls:'vx-progress working'},final:{label:'Final แล้ว',cls:'vx-progress final'}};
-const deriveType=(cad,mcq,short)=>{const n=[cad>0,mcq>0,short>0].filter(Boolean).length;if(n>1)return 'mixed';if(cad>0)return 'cad';if(mcq>0)return 'mcq';if(short>0)return 'short_answer';return 'mixed'};
+const deriveType=(cad,mcq)=>cad>0&&mcq>0?'mixed':cad>0?'cad':'mcq';
 
 export default function AssignmentDetail(){
- const {id}=useParams();
- const assignmentId=Number(id);
+ const {id}=useParams();const assignmentId=Number(id);
  const [assignment,setAssignment]=useState(null),[students,setStudents]=useState([]),[progress,setProgress]=useState([]),[finalRows,setFinalRows]=useState([]),[sections,setSections]=useState([]),[targetSections,setTargetSections]=useState([]),[team,setTeam]=useState([]);
- const [difficulty,setDifficulty]=useState('basic'),[cadCount,setCadCount]=useState(0),[mcqCount,setMcqCount]=useState(0),[shortCount,setShortCount]=useState(0),[subject,setSubject]=useState('SolidWorks'),[randomize,setRandomize]=useState(true),[selectedSections,setSelectedSections]=useState([]);
+ const [difficulty,setDifficulty]=useState('basic'),[cadCount,setCadCount]=useState(0),[mcqCount,setMcqCount]=useState(0),[subject,setSubject]=useState('SolidWorks'),[randomize,setRandomize]=useState(true),[selectedSections,setSelectedSections]=useState([]);
  const [studentSearch,setStudentSearch]=useState(''),[studentStatus,setStudentStatus]=useState('all'),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
 
  async function load(){
@@ -32,63 +31,47 @@ export default function AssignmentDetail(){
    vx.rpc('vx_teacher_team')
   ]);
   const err=ae||se||pe||fre||ste||me||te;if(err)setError(err.message);
-  const asg=a||null;setAssignment(asg);setProgress(pr||[]);setTeam(t||[]);
-  setFinalRows((fr||[]).filter(r=>Number(r.assignment_id)===assignmentId));
-  const ss=Array.from(new Map((structure||[]).filter(x=>x.section_id&&x.section_active).map(x=>[Number(x.section_id),{id:Number(x.section_id),code:x.section_code,name:x.section_name,department:x.department_name,year:x.academic_year,term:x.term}])).values());
-  setSections(ss);
-  const target=(maps||[]).map(x=>Number(x.section_id));setTargetSections(target);setSelectedSections(target);
-  const visibleStudents=(st||[]).filter(s=>!target.length||target.includes(Number(s.section_id)));
-  setStudents(visibleStudents);
-  if(asg){setDifficulty(asg.difficulty||'basic');setCadCount(Number(asg.cad_question_count||0));setMcqCount(Number(asg.mcq_question_count||0));setShortCount(Number(asg.short_answer_question_count||0));setSubject(asg.mcq_subject||'SolidWorks');setRandomize(asg.randomize_questions!==false)}
+  const asg=a||null;setAssignment(asg);setProgress(pr||[]);setTeam(t||[]);setFinalRows((fr||[]).filter(r=>Number(r.assignment_id)===assignmentId));
+  const ss=Array.from(new Map((structure||[]).filter(x=>x.section_id&&x.section_active).map(x=>[Number(x.section_id),{id:Number(x.section_id),code:x.section_code,name:x.section_name,department:x.department_name}])).values());setSections(ss);
+  const target=(maps||[]).map(x=>Number(x.section_id));setTargetSections(target);setSelectedSections(target);setStudents((st||[]).filter(s=>!target.length||target.includes(Number(s.section_id))));
+  if(asg){setDifficulty(asg.difficulty||'basic');setCadCount(Number(asg.cad_question_count||0));setMcqCount(Number(asg.mcq_question_count||0));setSubject(asg.mcq_subject||'SolidWorks');setRandomize(asg.randomize_questions!==false)}
   setLoading(false)
  }
  useEffect(()=>{if(assignmentId)load()},[assignmentId]);
-
  const hasStarted=progress.length>0;
  const owner=useMemo(()=>team.find(x=>x.user_id===assignment?.created_by)||null,[team,assignment]);
  const sectionMap=useMemo(()=>Object.fromEntries(sections.map(s=>[s.id,s])),[sections]);
  const progressMap=useMemo(()=>Object.fromEntries(progress.map(p=>[String(p.student_id),p])),[progress]);
- const finalAgg=useMemo(()=>{const m={};finalRows.forEach(r=>{const k=String(r.student_id);if(!m[k])m[k]={scores:[],types:{cad:[],mcq:[],short_answer:[]},final_at:r.submitted_at};const sc=Number(r.score||0);m[k].scores.push(sc);if(m[k].types[r.question_type])m[k].types[r.question_type].push(sc)});Object.values(m).forEach(x=>{x.avg=x.scores.length?Math.round(x.scores.reduce((a,b)=>a+b,0)/x.scores.length):0;for(const k of Object.keys(x.types)){const z=x.types[k];x[`${k}_avg`]=z.length?Math.round(z.reduce((a,b)=>a+b,0)/z.length):null}});return m},[finalRows]);
- const studentRows=useMemo(()=>students.map(s=>{const p=progressMap[String(s.student_id)],f=finalAgg[String(s.student_id)];return {...s,status:p?.status||'not_started',flagged_count:p?.flagged_count||0,started_at:p?.started_at||null,final_at:p?.final_at||f?.final_at||null,final_score:f?.avg??null,cad_score:f?.cad_avg??null,mcq_score:f?.mcq_avg??null,short_score:f?.short_answer_avg??null}}),[students,progressMap,finalAgg]);
+ const finalAgg=useMemo(()=>{const m={};finalRows.forEach(r=>{const k=String(r.student_id);if(!m[k])m[k]={scores:[],cad:[],mcq:[],final_at:r.submitted_at};const sc=Number(r.score||0);m[k].scores.push(sc);if(r.question_type==='cad')m[k].cad.push(sc);if(r.question_type==='mcq')m[k].mcq.push(sc)});Object.values(m).forEach(x=>{const avg=z=>z.length?Math.round(z.reduce((a,b)=>a+b,0)/z.length):null;x.avg=avg(x.scores)||0;x.cadAvg=avg(x.cad);x.mcqAvg=avg(x.mcq)});return m},[finalRows]);
+ const studentRows=useMemo(()=>students.map(s=>{const p=progressMap[String(s.student_id)],f=finalAgg[String(s.student_id)];return {...s,status:p?.status||'not_started',flagged_count:p?.flagged_count||0,final_score:f?.avg??null,cad_score:f?.cadAvg??null,mcq_score:f?.mcqAvg??null}}),[students,progressMap,finalAgg]);
  const visibleStudents=useMemo(()=>{const q=studentSearch.toLowerCase().trim();return studentRows.filter(s=>(studentStatus==='all'||s.status===studentStatus)&&(!q||`${s.full_name} ${s.student_code}`.toLowerCase().includes(q)))},[studentRows,studentSearch,studentStatus]);
  const stats=useMemo(()=>{const scores=studentRows.filter(x=>x.final_score!==null).map(x=>Number(x.final_score));return {total:studentRows.length,not_started:studentRows.filter(x=>x.status==='not_started').length,in_progress:studentRows.filter(x=>x.status==='in_progress').length,final:studentRows.filter(x=>x.status==='final').length,average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0}},[studentRows]);
- const total=Number(cadCount||0)+Number(mcqCount||0)+Number(shortCount||0);
-
- async function poolInfo(){const {data,error}=await vx.rpc('vx_teacher_assignment_pool_info_v2',{p_difficulty:difficulty,p_subject:subject||'SolidWorks',p_category_code:''});if(error)throw error;const x=data?.[0]||{};return {cad:Number(x.cad_family_count||0),mcq:Number(x.mcq_question_count||0),short:Number(x.short_answer_question_count||0)}}
+ const total=Number(cadCount||0)+Number(mcqCount||0);
+ async function poolInfo(){const {data,error}=await vx.rpc('vx_teacher_assignment_pool_info_v2',{p_difficulty:difficulty,p_subject:subject||'SolidWorks',p_category_code:''});if(error)throw error;const x=data?.[0]||{};return {cad:Number(x.cad_family_count||0),mcq:Number(x.mcq_question_count||0)}}
  async function saveRules(e){
   e.preventDefault();if(hasStarted||saving)return;setSaving(true);setError('');setMessage('');
   try{
-   if(total<1)throw new Error('กรุณากำหนดจำนวนข้ออย่างน้อย 1 ข้อ');
-   if(sections.length>0&&selectedSections.length===0)throw new Error('กรุณาเลือกอย่างน้อย 1 Section');
-   const pool=await poolInfo();
-   if(cadCount>pool.cad)throw new Error(`CAD Bank มี ${pool.cad} Family แต่ต้องการ ${cadCount} ข้อ`);
-   if(mcqCount>pool.mcq)throw new Error(`MCQ Bank มี ${pool.mcq} ข้อ แต่ต้องการ ${mcqCount} ข้อ`);
-   if(shortCount>pool.short)throw new Error(`คลังเติมคำมี ${pool.short} ข้อ แต่ต้องการ ${shortCount} ข้อ`);
-   const type=deriveType(cadCount,mcqCount,shortCount);
-   const {error}=await vx.from('vx_assignments').update({difficulty,question_count:total,assignment_type:type,question_category:type==='cad'?'part_modeling':type,cad_question_count:cadCount,mcq_question_count:mcqCount,short_answer_question_count:shortCount,mcq_subject:subject||'SolidWorks',randomize_questions:randomize,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)throw error;
+   if(total<1)throw new Error('กรุณากำหนดจำนวนข้ออย่างน้อย 1 ข้อ');if(sections.length>0&&selectedSections.length===0)throw new Error('กรุณาเลือกอย่างน้อย 1 Section');
+   const pool=await poolInfo();if(cadCount>pool.cad)throw new Error(`CAD Bank มี ${pool.cad} Family แต่ต้องการ ${cadCount} ข้อ`);if(mcqCount>pool.mcq)throw new Error(`MCQ Bank มี ${pool.mcq} ข้อ แต่ต้องการ ${mcqCount} ข้อ`);
+   const type=deriveType(cadCount,mcqCount);const {error}=await vx.from('vx_assignments').update({difficulty,question_count:total,assignment_type:type,question_category:type==='mcq'?'mcq':'part_modeling',cad_question_count:cadCount,mcq_question_count:mcqCount,mcq_subject:subject||'SolidWorks',randomize_questions:randomize,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)throw error;
    if(sections.length>0){const {error:mapErr}=await vx.rpc('vx_teacher_set_assignment_sections',{p_assignment_id:assignmentId,p_section_ids:selectedSections});if(mapErr)throw mapErr}
    setMessage('บันทึกกติกา Assignment แล้ว');await load();
   }catch(err){setError(err.message)}finally{setSaving(false)}
  }
  async function setStatus(status){setError('');setMessage('');const {error}=await vx.from('vx_assignments').update({status,updated_at:new Date().toISOString()}).eq('id',assignmentId);if(error)return setError(error.message);setMessage(`เปลี่ยนสถานะเป็น ${statusLabel[status]} แล้ว`);await load()}
  function toggleSection(id){setSelectedSections(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id])}
-
  if(loading)return <main className="vx-page"><div className="vx-wrap"><div className="vx-empty">กำลังโหลด Assignment...</div></div></main>;
  if(!assignment)return <main className="vx-page"><div className="vx-wrap"><div className="vx-error">ไม่พบ Assignment หรือคุณไม่มีสิทธิ์เข้าถึง</div></div></main>;
-
  return <main className="vx-page"><div className="vx-wrap"><TeacherNav active="assignments"/>
   <header className="vx-top"><div><Link className="vx-file" href="/verifyx/teacher"><ArrowLeft size={15}/>Assignments</Link><p className="vx-kicker" style={{marginTop:14}}>ASSIGNMENT DETAIL</p><h1>{assignment.title}</h1><p>{assignment.course||'ไม่ระบุวิชา'} · {statusLabel[assignment.status]||assignment.status}</p><div className="vx-tags"><span>{typeLabel[assignment.assignment_type]||assignment.assignment_type}</span><span>{diffLabel[assignment.difficulty]}</span><span>ครู {owner?.display_name||'—'}</span>{targetSections.length?targetSections.map(x=><span key={x}>Section {sectionMap[x]?.name||x}</span>):<span>Legacy · ทั้งโรงเรียน</span>}</div></div><div className="vx-toolbar"><button className="vx-btn secondary" onClick={load}><RefreshCw size={15}/>Refresh</button><Link className="vx-btn secondary" href="/verifyx/teacher/question-bank"><Boxes size={15}/>Question Bank</Link></div></header>
   {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
-
   <section className="vx-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',marginBottom:14}}><div className="vx-card"><small>นักเรียนเป้าหมาย</small><h2>{stats.total}</h2></div><div className="vx-card"><small>ยังไม่เริ่ม</small><h2>{stats.not_started}</h2></div><div className="vx-card"><small>กำลังทำ</small><h2>{stats.in_progress}</h2></div><div className="vx-card"><small>Final</small><h2>{stats.final}</h2></div><div className="vx-card"><small>คะแนนเฉลี่ย</small><h2>{stats.average}/100</h2></div></section>
-
-  <section className="vx-card" style={{marginBottom:14}}><div className="vx-top"><div><p className="vx-kicker">RULES</p><h2>กติกา Assignment</h2><p>{hasStarted?'มีนักเรียนเริ่มแล้ว กติกาและ Section ถูกล็อก':'แก้จำนวนโจทย์แต่ละชนิดและ Section ได้จนกว่าจะมีนักเรียนเริ่ม'}</p></div>{hasStarted?<span className="vx-progress working"><LockKeyhole size={13}/>Locked</span>:<span className="vx-progress final">Editable</span>}</div>
-   <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>Difficulty<select value={difficulty} disabled={hasStarted} onChange={e=>setDifficulty(e.target.value)}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label><label>Subject<input value={subject} disabled={hasStarted} onChange={e=>setSubject(e.target.value)}/></label></div><div className="vx-form-row"><label>CAD<input type="number" min="0" value={cadCount} disabled={hasStarted} onChange={e=>setCadCount(Math.max(0,Number(e.target.value)||0))}/></label><label>ปรนัย<input type="number" min="0" value={mcqCount} disabled={hasStarted} onChange={e=>setMcqCount(Math.max(0,Number(e.target.value)||0))}/></label><label>เติมคำ<input type="number" min="0" value={shortCount} disabled={hasStarted} onChange={e=>setShortCount(Math.max(0,Number(e.target.value)||0))}/></label></div><div className="vx-tags"><span>CAD {cadCount}</span><span>ปรนัย {mcqCount}</span><span>เติมคำ {shortCount}</span><span><b>รวม {total} ข้อ</b></span></div>
+  <section className="vx-card" style={{marginBottom:14}}><div className="vx-top"><div><p className="vx-kicker">RULES</p><h2>กติกา Assignment</h2><p>{hasStarted?'มีนักเรียนเริ่มแล้ว กติกาและ Section ถูกล็อก':'กำหนดจำนวน CAD / ปรนัย และ Section ได้จนกว่าจะมีนักเรียนเริ่ม'}</p></div>{hasStarted?<span className="vx-progress working"><LockKeyhole size={13}/>Locked</span>:<span className="vx-progress final">Editable</span>}</div>
+   <form className="vx-form" onSubmit={saveRules}><div className="vx-form-row"><label>Difficulty<select value={difficulty} disabled={hasStarted} onChange={e=>setDifficulty(e.target.value)}><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label><label>Subject สำหรับปรนัย<input value={subject} disabled={hasStarted} onChange={e=>setSubject(e.target.value)}/></label></div><div className="vx-form-row"><label>CAD / Mass Properties<input type="number" min="0" value={cadCount} disabled={hasStarted} onChange={e=>setCadCount(Math.max(0,Number(e.target.value)||0))}/></label><label>ปรนัย<input type="number" min="0" value={mcqCount} disabled={hasStarted} onChange={e=>setMcqCount(Math.max(0,Number(e.target.value)||0))}/></label></div><div className="vx-tags"><span>CAD {cadCount}</span><span>ปรนัย {mcqCount}</span><span><b>รวม {total} ข้อ</b></span></div>
    {sections.length>0&&<div><p className="vx-kicker" style={{marginTop:12}}>TARGET SECTION</p><div className="vx-list">{sections.map(s=><label key={s.id} className="vx-card" style={{padding:11,display:'flex',gap:9,alignItems:'center',cursor:hasStarted?'default':'pointer'}}><input type="checkbox" checked={selectedSections.includes(s.id)} disabled={hasStarted} onChange={()=>toggleSection(s.id)}/><span><b>{s.department} · {s.name}</b> <small>({s.code})</small></span></label>)}</div></div>}
    <label className="vx-checkline"><input type="checkbox" checked={randomize} disabled={hasStarted} onChange={e=>setRandomize(e.target.checked)}/><span>สุ่มโจทย์และสลับตัวเลือกปรนัย</span></label><button className="vx-btn primary" disabled={hasStarted||saving||total<1}>{saving?'กำลังตรวจคลัง...':'บันทึกกติกา'}</button></form>
-   <div className="vx-toolbar" style={{marginTop:12}}>{assignment.status!=='open'&&<button className="vx-link secondary" onClick={()=>setStatus('open')}>เปิดรับงาน</button>}{assignment.status==='open'&&<button className="vx-link secondary" onClick={()=>setStatus('closed')}>ปิดรับงาน</button>}{assignment.status!=='draft'&&!hasStarted&&<button className="vx-link secondary" onClick={()=>setStatus('draft')}>กลับเป็นฉบับร่าง</button>}</div>
+   <div className="vx-toolbar" style={{marginTop:12}}>{assignment.status!=='open'&&<button className="vx-link secondary" onClick={()=>setStatus('open')}>เปิดรับงาน</button>}{assignment.status==='open'&&<button className="vx-link secondary" onClick={()=>setStatus('closed')}>ปิดรับงาน</button>}</div>
   </section>
-
-  <section className="vx-card"><div className="vx-top"><div><p className="vx-kicker">STUDENTS</p><h2>นักเรียนใน Assignment นี้</h2><p>แสดงเฉพาะนักเรียนใน Section เป้าหมาย</p></div><UsersRound size={22}/></div><div className="vx-form"><div className="vx-form-row"><label>ค้นหา<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="ชื่อหรือรหัสนักเรียน"/></label><label>สถานะ<select value={studentStatus} onChange={e=>setStudentStatus(e.target.value)}><option value="all">ทั้งหมด</option><option value="not_started">ยังไม่เริ่ม</option><option value="in_progress">กำลังทำ</option><option value="final">Final แล้ว</option></select></label></div></div><div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}{s.section_id?` · ${sectionMap[Number(s.section_id)]?.name||'Section'}`:''}</p><div className="vx-tags">{s.status==='in_progress'&&s.flagged_count>0&&<span>🟨 มาร์กไว้ {s.flagged_count}</span>}{s.status==='final'&&<><span>รวม {s.final_score??0}/100</span>{s.cad_score!==null&&<span>CAD {s.cad_score}</span>}{s.mcq_score!==null&&<span>ปรนัย {s.mcq_score}</span>}{s.short_score!==null&&<span>เติมคำ {s.short_score}</span>}</>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนในกลุ่มเป้าหมาย</div>}</div></section>
+  <section className="vx-card"><div className="vx-top"><div><p className="vx-kicker">STUDENTS</p><h2>นักเรียนใน Assignment นี้</h2><p>แสดงเฉพาะนักเรียนใน Section เป้าหมาย</p></div><UsersRound size={22}/></div><div className="vx-form"><div className="vx-form-row"><label>ค้นหา<input value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} placeholder="ชื่อหรือรหัสนักเรียน"/></label><label>สถานะ<select value={studentStatus} onChange={e=>setStudentStatus(e.target.value)}><option value="all">ทั้งหมด</option><option value="not_started">ยังไม่เริ่ม</option><option value="in_progress">กำลังทำ</option><option value="final">Final แล้ว</option></select></label></div></div><div className="vx-list">{visibleStudents.length?visibleStudents.map(s=>{const meta=progressMeta[s.status];return <article className="vx-item" key={s.student_id}><div><h3>{s.full_name}</h3><p>{s.student_code}{s.section_id?` · ${sectionMap[Number(s.section_id)]?.name||'Section'}`:''}</p><div className="vx-tags">{s.status==='in_progress'&&s.flagged_count>0&&<span>🟨 มาร์กไว้ {s.flagged_count}</span>}{s.status==='final'&&<><span>รวม {s.final_score??0}/100</span>{s.cad_score!==null&&<span>CAD {s.cad_score}</span>}{s.mcq_score!==null&&<span>ปรนัย {s.mcq_score}</span>}</>}</div></div><span className={meta.cls}>{meta.label}</span></article>}):<div className="vx-empty">ไม่พบนักเรียนในกลุ่มเป้าหมาย</div>}</div></section>
  </div></main>;
 }
