@@ -1,0 +1,2 @@
+Trigger build after VerifyX CAD mix + final score frontend patch.
+Target app commit: 0ba5c33c4209187d35e436737d765a2476b87602
