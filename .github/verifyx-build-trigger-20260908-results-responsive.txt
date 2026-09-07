@@ -1,0 +1,2 @@
+VerifyX Results responsive mobile production build trigger
+source commit: 8fec6a2e41f1673107311842523cab4be10dd7d8
