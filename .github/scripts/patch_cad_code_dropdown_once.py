@@ -1,0 +1,84 @@
+from pathlib import Path
+import re
+
+p = Path('app/verifyx/teacher/question-bank/page.js')
+s = p.read_text(encoding='utf-8')
+
+old_state = "const [teacherCode,setTeacherCode]=useState(''),[editCadId,setEditCadId]=useState(null);"
+new_state = "const [teacherCode,setTeacherCode]=useState(''),[editCadId,setEditCadId]=useState(null),[cadCodeChoice,setCadCodeChoice]=useState('');"
+if old_state in s:
+    s = s.replace(old_state, new_state, 1)
+elif 'cadCodeChoice,setCadCodeChoice' not in s:
+    raise SystemExit('state anchor not found')
+
+new_add = r'''async function addCadQuestion(e){
+  e.preventDefault();if(saving)return;setSaving(true);setError('');setMessage('');
+  const form=e.currentTarget,fd=new FormData(form);
+  let familyId=null,createdFamily=false;
+  try{
+   const codeChoice=String(fd.get('codeChoice')||'').trim();
+   if(!codeChoice)throw new Error('กรุณาเลือก Code');
+   const title=String(fd.get('title')||'').trim();
+   if(!title)throw new Error('กรุณาใส่ชื่อโจทย์');
+
+   if(codeChoice==='__new__'){
+    const code=String(fd.get('newCode')||'').trim().toUpperCase();
+    const category=String(fd.get('category')||'part_modeling');
+    const difficulty=String(fd.get('difficulty')||'basic');
+    const lotCode=String(fd.get('lotCode')||'').trim();
+    const lot=teacherCode&&lotCode?`${teacherCode}-${lotCode}`:'';
+    if(!code)throw new Error('กรุณาใส่ Code ใหม่');
+    if(!lot)throw new Error('ไม่พบชื่อครูหรือรหัส Lot');
+    const {data:exists,error:checkError}=await vx.from('vx_question_families').select('id').eq('code',code).limit(1);
+    if(checkError)throw checkError;
+    if((exists||[]).length)throw new Error(`Code ${code} มีอยู่แล้ว กรุณาเลือกจาก Dropdown`);
+    const {data:family,error:familyError}=await vx.from('vx_question_families').insert({code,name:code,category,lot,difficulty,description:''}).select('id').single();
+    if(familyError)throw familyError;
+    familyId=family?.id;createdFamily=true;
+   }else{
+    const {data:family,error:familyError}=await vx.from('vx_question_families').select('id').eq('code',codeChoice).single();
+    if(familyError)throw familyError;
+    familyId=family?.id;
+   }
+   if(!familyId)throw new Error('ไม่พบกลุ่ม Code ที่เลือก');
+
+   const drawing=fd.get('drawing'),image=fd.get('modelImage');
+   const drawingPath=await upload(drawing,'drawing');
+   const imagePath=image?.name?await upload(image,'model'):null;
+   const variantCode=`Q-${crypto.randomUUID().slice(0,8).toUpperCase()}`;
+
+   const {error:questionError}=await vx.from('vx_question_bank').insert({
+    family_id:familyId,variant_code:variantCode,title,drawing_path:drawingPath,drawing_name:drawing?.name||null,
+    model_image_path:imagePath,model_image_name:image?.name||null,show_model_preview:Boolean(imagePath)&&fd.get('preview')==='on',
+    reference_volume:Number(fd.get('volume')).toFixed(3),reference_area:Number(fd.get('area')).toFixed(3),reference_mass:Number(fd.get('mass')).toFixed(3),
+    reference_com_x:0,reference_com_y:0,reference_com_z:0
+   });
+   if(questionError)throw questionError;
+
+   form.reset();setCadCodeChoice('');setShowCadQuestion(false);setMessage('เพิ่มโจทย์ CAD แล้ว');await load();
+  }catch(err){
+   if(createdFamily&&familyId)await vx.from('vx_question_families').delete().eq('id',familyId);
+   setError(err.message);
+  }finally{setSaving(false)}
+ }'''
+
+s2, n = re.subn(r"async function addCadQuestion\(e\)\{.*?\n \}\n\n async function updateCadQuestion", new_add + "\n\n async function updateCadQuestion", s, count=1, flags=re.S)
+if n != 1:
+    raise SystemExit(f'addCadQuestion replacement count={n}')
+s = s2
+
+old_toggle = "onClick={()=>{setShowCadQuestion(v=>!v);setEditCadId(null)}}"
+new_toggle = "onClick={()=>{setShowCadQuestion(v=>!v);setEditCadId(null);setCadCodeChoice('')}}"
+if old_toggle in s:
+    s = s.replace(old_toggle,new_toggle,1)
+
+new_form = r'''{mode==='cad'&&showCadQuestion&&<section className="vx-card"><p className="vx-kicker">NEW CAD QUESTION</p><h3>เพิ่มโจทย์ CAD</h3><form className="vx-form" onSubmit={addCadQuestion}><div className="vx-form-row"><label>Code<select name="codeChoice" value={cadCodeChoice} onChange={e=>setCadCodeChoice(e.target.value)} required><option value="" disabled>เลือก Code</option>{families.map(f=><option key={f.id} value={f.code}>{f.code}</option>)}<option value="__new__">+ สร้าง Code ใหม่</option></select></label><label>ชื่อโจทย์<input name="title" placeholder="เช่น PART-003" required/></label></div>{cadCodeChoice==='__new__'?<><label>Code ใหม่<input name="newCode" placeholder="เช่น 3D-EXERCISES" required/></label><div className="vx-form-row"><label>Category<select name="category" defaultValue="part_modeling">{categoryOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><label>Lot<div style={{display:'grid',gridTemplateColumns:'minmax(100px,1fr) auto minmax(86px,110px)',gap:8,alignItems:'center'}}><input value={teacherCode||'กำลังโหลด...'} readOnly aria-label="Teacher Lot Prefix"/><b>-</b><input name="lotCode" defaultValue="001" inputMode="numeric" pattern="[0-9]{3}" maxLength={3} placeholder="001" required/></div></label></>:cadCodeChoice?<div className="vx-result">ใช้ Category · ระดับ · Lot ของ Code <b>{cadCodeChoice}</b> อัตโนมัติ</div>:null}<label>Drawing PDF<input name="drawing" type="file" accept="application/pdf,.pdf" required/></label><div className="vx-mass-grid"><label>Volume mm³<input name="volume" type="number" step="0.001" required/></label><label>Surface Area mm²<input name="area" type="number" step="0.001" required/></label><label>Mass g<input name="mass" type="number" step="0.001" required/></label></div><label>Model Reference Image<input name="modelImage" type="file" accept="image/png,image/jpeg,image/webp"/></label><label><span><input name="preview" type="checkbox"/> ให้นักเรียนเห็น Model Image</span></label><button className="vx-btn primary" disabled={saving||!cadCodeChoice||(cadCodeChoice==='__new__'&&!teacherCode)}>{saving?'กำลังบันทึก...':'บันทึกโจทย์ CAD'}</button></form></section>}'''
+
+pattern = r"\{mode==='cad'&&showCadQuestion&&<section className=\"vx-card\">.*?</section>\}\n\n  \{mode==='mcq'"
+repl = new_form + "\n\n  {mode==='mcq'"
+s2, n = re.subn(pattern, repl, s, count=1, flags=re.S)
+if n != 1:
+    raise SystemExit(f'CAD form replacement count={n}')
+s = s2
+
+p.write_text(s, encoding='utf-8')
