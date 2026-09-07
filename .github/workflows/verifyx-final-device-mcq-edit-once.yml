@@ -1,0 +1,33 @@
+name: VerifyX Final Device and MCQ Edit Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verifyx-final-device-mcq-edit-once.yml'
+      - 'scripts/oneoff/verifyx-final-device-and-mcq-edit.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply patch
+        run: python scripts/oneoff/verifyx-final-device-and-mcq-edit.py
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verifyx/student/assignment/'[id]'/page.js app/verifyx/teacher/question-bank/page.js
+          git commit -m "feat: capture final device and edit MCQs"
+          git push
