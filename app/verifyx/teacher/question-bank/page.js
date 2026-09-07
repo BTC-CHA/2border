@@ -16,6 +16,7 @@ export default function QuestionBankPage(){
  const [mode,setMode]=useState('cad'),[mcqTab,setMcqTab]=useState('school'),[filter,setFilter]=useState('all'),[search,setSearch]=useState('');
  const [cadCategory,setCadCategory]=useState('all'),[cadLot,setCadLot]=useState('all');
  const [showFamily,setShowFamily]=useState(false),[showVariant,setShowVariant]=useState(false),[showMcq,setShowMcq]=useState(false),[showOrganize,setShowOrganize]=useState(false),[selectedSystem,setSelectedSystem]=useState([]);
+ const [teacherCode,setTeacherCode]=useState('');
 
  async function load(){
   setLoading(true);setError('');
@@ -28,7 +29,14 @@ export default function QuestionBankPage(){
   const err=fe||qe||me||se;if(err)setError(err.message);
   setFamilies(f||[]);setItems(q||[]);setSchoolMcq(m||[]);setSystemMcq(s||[]);setLoading(false)
  }
- useEffect(()=>{load()},[]);
+ async function loadTeacherCode(){
+  const [{data:u,error:ue},{data:t,error:te}]=await Promise.all([vx.auth.getUser(),vx.rpc('vx_teacher_team')]);
+  const err=ue||te;if(err)return setError(err.message);
+  const uid=u?.user?.id,me=(t||[]).find(x=>x.user_id===uid);
+  const code=String(me?.display_name||u?.user?.user_metadata?.display_name||'').trim();
+  setTeacherCode(code);
+ }
+ useEffect(()=>{load();loadTeacherCode()},[]);
 
  const familyMap=useMemo(()=>Object.fromEntries(families.map(f=>[f.id,f])),[families]);
  const cadCategories=useMemo(()=>Array.from(new Set(families.map(f=>f.category).filter(Boolean))).sort(),[families]);
@@ -40,11 +48,14 @@ export default function QuestionBankPage(){
  async function addFamily(e){
   e.preventDefault();if(saving)return;setSaving(true);setError('');
   const form=e.currentTarget,fd=new FormData(form);
+  const lotCode=String(fd.get('lotCode')||'').trim();
+  const lot=teacherCode&&lotCode?`${teacherCode}-${lotCode}`:'';
+  if(!lot){setSaving(false);return setError('ไม่พบชื่อครูหรือรหัส Lot')}
   const {error}=await vx.from('vx_question_families').insert({
    code:String(fd.get('code')).trim().toUpperCase(),
    name:String(fd.get('name')).trim(),
    category:String(fd.get('category')||'part_modeling'),
-   lot:String(fd.get('lot')||'General').trim()||'General',
+   lot,
    difficulty:String(fd.get('difficulty')),
    description:String(fd.get('description')||'').trim()
   });
@@ -84,7 +95,7 @@ export default function QuestionBankPage(){
 
   {mode==='cad'&&showOrganize&&<section className="vx-card"><p className="vx-kicker">ORGANIZE</p><h3>จัด Category / Lot ของ Family</h3><p>Variant ทุกตัวใน Family เดียวกันจะใช้ Category และ Lot เดียวกัน</p><div className="vx-list">{families.map(f=><form key={f.id} className="vx-item" onSubmit={e=>updateFamily(e,f.id)} style={{alignItems:'end'}}><div style={{flex:'1 1 220px'}}><b>{f.code} · {f.name}</b><p>{diffLabel[f.difficulty]} · {categoryLabel[f.category]||f.category} · Lot {f.lot||'General'}</p></div><label style={{minWidth:180}}>Category<select name="category" defaultValue={f.category||'part_modeling'}>{categoryOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label style={{minWidth:150}}>Lot<input name="lot" defaultValue={f.lot||'General'} placeholder="เช่น LOT-01"/></label><button className="vx-file" disabled={saving}><Save size={14}/>บันทึก</button></form>)}</div></section>}
 
-  {mode==='cad'&&showFamily&&<section className="vx-card"><h3>เพิ่ม Question Family</h3><form className="vx-form" onSubmit={addFamily}><div className="vx-form-row"><label>Family Code<input name="code" placeholder="P-006" required/></label><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>Category<select name="category" defaultValue="part_modeling">{categoryOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>Lot<input name="lot" defaultValue="General" placeholder="เช่น LOT-01" required/></label></div><label>ชื่อ Family<input name="name" required/></label><label>คำอธิบาย<textarea name="description" rows="2"/></label><button className="vx-btn primary" disabled={saving}>{saving?'กำลังบันทึก...':'บันทึก Family'}</button></form></section>}
+  {mode==='cad'&&showFamily&&<section className="vx-card"><h3>เพิ่ม Question Family</h3><form className="vx-form" onSubmit={addFamily}><div className="vx-form-row"><label>Family Code<input name="code" placeholder="P-006" required/></label><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>Category<select name="category" defaultValue="part_modeling">{categoryOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>Lot<div style={{display:'grid',gridTemplateColumns:'minmax(100px,1fr) auto minmax(86px,110px)',gap:8,alignItems:'center'}}><input value={teacherCode||'กำลังโหลด...'} readOnly aria-label="Teacher Lot Prefix"/><b>-</b><input name="lotCode" defaultValue="001" inputMode="numeric" pattern="[0-9]{3}" maxLength={3} placeholder="001" required/></div></label></div><label>ชื่อ Family<input name="name" required/></label><label>คำอธิบาย<textarea name="description" rows="2"/></label><button className="vx-btn primary" disabled={saving||!teacherCode}>{saving?'กำลังบันทึก...':'บันทึก Family'}</button></form></section>}
 
   {mode==='cad'&&showVariant&&<section className="vx-card"><h3>เพิ่ม CAD Variant</h3><form className="vx-form" onSubmit={addVariant}><div className="vx-form-row"><label>Family<select name="familyId" required defaultValue=""><option value="" disabled>เลือก Family</option>{families.map(f=><option key={f.id} value={f.id}>{f.code} · {f.name} · {categoryLabel[f.category]||f.category} · {f.lot||'General'} · {diffLabel[f.difficulty]}</option>)}</select></label><label>Variant Code<input name="variantCode" placeholder="A" required/></label></div><label>ชื่อโจทย์<input name="title" required/></label><label>Drawing PDF<input name="drawing" type="file" accept="application/pdf,.pdf" required/></label><div className="vx-mass-grid"><label>Volume mm³<input name="volume" type="number" step="0.001" required/></label><label>Surface Area mm²<input name="area" type="number" step="0.001" required/></label><label>Mass g<input name="mass" type="number" step="0.001" required/></label><label>COM X<input name="x" type="number" step="0.001" required/></label><label>COM Y<input name="y" type="number" step="0.001" required/></label><label>COM Z<input name="z" type="number" step="0.001" required/></label></div><label>Model Reference Image<input name="modelImage" type="file" accept="image/png,image/jpeg,image/webp"/></label><label><span><input name="preview" type="checkbox"/> แสดง Model Image ให้นักเรียนเห็น</span></label><button className="vx-btn primary" disabled={saving}>{saving?'กำลังบันทึก...':'บันทึก Variant'}</button></form></section>}
 
