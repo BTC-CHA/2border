@@ -1,0 +1,29 @@
+name: Patch CAD Code Manager Auto Title Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'patch_manage_codes_auto_title.py'
+      - '.github/workflows/patch-cad-code-manager-auto-title-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch question bank
+        run: python3 patch_manage_codes_auto_title.py
+      - name: Commit patch and cleanup
+        run: |
+          git config user.name "BTC-CHA"
+          git config user.email "93521971+BTC-CHA@users.noreply.github.com"
+          git rm patch_manage_codes_auto_title.py .github/workflows/patch-cad-code-manager-auto-title-once.yml
+          git add app/verifyx/teacher/question-bank/page.js
+          git commit -m "feat: manage CAD codes and auto-number questions"
+          git push origin HEAD:main
