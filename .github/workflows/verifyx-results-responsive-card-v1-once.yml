@@ -1,0 +1,35 @@
+name: VerifyX Results Responsive Card V1 Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verifyx-results-responsive-card-v1-once.yml'
+      - 'scripts/oneoff/verifyx-results-responsive-card-v1.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply Results responsive patch
+        run: python scripts/oneoff/verifyx-results-responsive-card-v1.py
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verifyx/teacher/results/page.js app/verifyx/teacher/teacher-ui.css
+          if git diff --cached --quiet; then
+            echo "No source changes"
+          else
+            git commit -m "fix: make VerifyX Results responsive on mobile"
+            git push
+          fi
