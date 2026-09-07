@@ -1,0 +1,3 @@
+VerifyX patch applied by one-off workflow.
+- Student Final sends stable browser device_id and user agent to v4 finalize RPC.
+- School Bank MCQ cards have Edit controls.
