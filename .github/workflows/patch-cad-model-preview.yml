@@ -1,0 +1,62 @@
+name: Patch CAD Model Preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-cad-model-preview.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch question bank card preview
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/verifyx/teacher/question-bank/page.js')
+          s = p.read_text(encoding='utf-8')
+
+          anchor = 'export default function QuestionBankPage(){'
+          component = r'''function CadModelPreview({path,title,onOpen}){
+ const [url,setUrl]=useState('');
+ useEffect(()=>{let alive=true;setUrl('');if(!path)return()=>{alive=false};(async()=>{const {data}=await vx.storage.from(VX_BUCKET).createSignedUrl(path,3600);if(alive&&data?.signedUrl)setUrl(data.signedUrl)})();return()=>{alive=false}},[path]);
+ if(!path)return null;
+ return <button type="button" onClick={onOpen} title="เปิด Model Image" style={{width:100,height:80,flex:'0 0 100px',padding:0,border:'1px solid #f0ddd1',borderRadius:12,background:'#fff7f1',overflow:'hidden',display:'grid',placeItems:'center',cursor:'pointer'}}>{url?<img src={url} alt={title||'Model preview'} style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>:<ImageIcon size={22}/>}</button>
+}
+
+'''
+          if 'function CadModelPreview(' not in s:
+              if anchor not in s:
+                  raise SystemExit('QuestionBankPage anchor not found')
+              s = s.replace(anchor, component + anchor, 1)
+
+          old = "<p>{categoryLabel[f?.category]||f?.category||'Part Modeling'} · Lot {f?.lot||'General'}</p></div><span className={`vx-progress ${q.is_active?'final':'muted'}`}>"
+          new = "<p>{categoryLabel[f?.category]||f?.category||'Part Modeling'} · Lot {f?.lot||'General'}</p></div><CadModelPreview path={q.model_image_path} title={q.title} onOpen={()=>openFile(q.model_image_path)}/><span className={`vx-progress ${q.is_active?'final':'muted'}`}>"
+          if '<CadModelPreview path={q.model_image_path}' not in s:
+              if old not in s:
+                  raise SystemExit('CAD card header anchor not found')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "BTC-CHA"
+          git config user.email "93521971+BTC-CHA@users.noreply.github.com"
+          git add app/verifyx/teacher/question-bank/page.js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "feat: preview CAD model image on question card"
+          git push origin HEAD:main
