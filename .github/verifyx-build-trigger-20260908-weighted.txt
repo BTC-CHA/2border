@@ -1,2 +1,2 @@
 VerifyX weighted scoring production build trigger
-source commit: 4c24b67a8d90560a11833b4191a93bd0cc853dbf
+source commit: 5f5c3563b0eb724b2931523730d1e427b295182b
