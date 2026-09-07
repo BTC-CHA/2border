@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {ArrowLeft,ArrowRight,FileText,Flag,Save,Send,ListChecks} from 'lucide-react';
 import {vx,VX_BUCKET} from '../../../vxClient';
 
-const blankCad={volume:'',surface_area:'',mass:'',com_x:'',com_y:'',com_z:'',saved:false,dirty:false};
+const blankCad={volume:'',surface_area:'',mass:'',saved:false,dirty:false};
 const thaiKey={A:'ก',B:'ข',C:'ค',D:'ง'};
 const VX_DEVICE_KEY='verifyx_device_id_v1';
 function getVerifyXDeviceId(){
@@ -20,7 +20,7 @@ function getVerifyXDeviceId(){
 export default function StudentAssignment(){
  const {id}=useParams();
  const assignmentId=Number(id);
- const [profile,setProfile]=useState(null),[assignment,setAssignment]=useState(null),[items,setItems]=useState([]),[answers,setAnswers]=useState({});
+ const [profile,setProfile]=useState(null),[assignment,setAssignment]=useState(null),[items,setItems]=useState([]),[answers,setAnswers]=useState({}),[finalSummary,setFinalSummary]=useState(null);
  const [stage,setStage]=useState('work'),[status,setStatus]=useState('in_progress'),[finalAt,setFinalAt]=useState(null),[currentIndex,setCurrentIndex]=useState(0);
  const [savingId,setSavingId]=useState(null),[finalizing,setFinalizing]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
  const hasDirty=useMemo(()=>Object.values(answers).some(a=>a?.dirty),[answers]);
@@ -44,8 +44,9 @@ export default function StudentAssignment(){
   if(xs[0]){setStatus(xs[0].progress_status);setFinalAt(xs[0].final_at||null);if(xs[0].progress_status==='final')setStage('summary')}
   setAnswers(Object.fromEntries(xs.map(x=>x.question_type==='mcq'
    ?[x.item_id,{choice:x.selected_choice_key||'',saved:!!x.selected_choice_key,dirty:false}]
-   :[x.item_id,{volume:x.volume??'',surface_area:x.surface_area??'',mass:x.mass??'',com_x:x.com_x??'',com_y:x.com_y??'',com_z:x.com_z??'',saved:[x.volume,x.surface_area,x.mass,x.com_x,x.com_y,x.com_z].every(v=>v!==null&&v!==undefined),dirty:false}]
+   :[x.item_id,{volume:x.volume??'',surface_area:x.surface_area??'',mass:x.mass??'',saved:[x.volume,x.surface_area,x.mass].every(v=>v!==null&&v!==undefined),dirty:false}]
   )));
+  if(xs[0]?.progress_status==='final'){const {data:summary}=await vx.rpc('vx_student_final_summary_auth',{p_assignment_id:assignmentId});setFinalSummary(summary?.[0]||null)}else setFinalSummary(null);
   setLoading(false)
  }
 
@@ -66,10 +67,10 @@ export default function StudentAssignment(){
  }
 
  async function saveCad(item){
-  if(savingId)return;const a=answers[item.item_id]||{};const vals=[a.volume,a.surface_area,a.mass,a.com_x,a.com_y,a.com_z];
+  if(savingId)return;const a=answers[item.item_id]||{};const vals=[a.volume,a.surface_area,a.mass];
   if(vals.some(v=>v===''||v===null||v===undefined||!Number.isFinite(Number(v)))){setError(`ข้อ ${item.slot_no} ยังกรอกข้อมูลไม่ครบหรือมีค่าที่ไม่ถูกต้อง`);return}
   setSavingId(item.item_id);setError('');setMessage('');
-  const {error}=await vx.rpc('vx_student_save_answer_auth',{p_assignment_id:assignmentId,p_item_id:item.item_id,p_volume:Number(a.volume).toFixed(3),p_surface_area:Number(a.surface_area).toFixed(3),p_mass:Number(a.mass).toFixed(3),p_com_x:Number(a.com_x).toFixed(3),p_com_y:Number(a.com_y).toFixed(3),p_com_z:Number(a.com_z).toFixed(3),p_is_flagged:item.is_flagged});
+  const {error}=await vx.rpc('vx_student_save_answer_auth',{p_assignment_id:assignmentId,p_item_id:item.item_id,p_volume:Number(a.volume).toFixed(3),p_surface_area:Number(a.surface_area).toFixed(3),p_mass:Number(a.mass).toFixed(3),p_com_x:null,p_com_y:null,p_com_z:null,p_is_flagged:item.is_flagged});
   setSavingId(null);if(error){setError(error.message);return}
   setAnswers(x=>({...x,[item.item_id]:{...a,saved:true,dirty:false}}));setMessage(`บันทึกข้อ ${item.slot_no} แล้ว`);
  }
@@ -84,7 +85,7 @@ export default function StudentAssignment(){
   if(!confirm('หลัง Final แล้วจะกลับมาแก้คำตอบไม่ได้\nยืนยันส่งคำตอบสุดท้าย?'))return;
   setFinalizing(true);setError('');const deviceId=getVerifyXDeviceId();const {data,error}=await vx.rpc('vx_student_finalize_assignment_v4_auth',{p_assignment_id:assignmentId,p_device_id:deviceId,p_user_agent:navigator.userAgent||''});setFinalizing(false);
   if(error){setError(error.message);return}
-  const result=data||[];setStatus('final');setFinalAt(result[0]?.final_at||new Date().toISOString());setStage('summary');setMessage('ส่ง Final เรียบร้อยแล้ว ระบบล็อกคำตอบแล้ว')
+  const result=data||[];const {data:summary}=await vx.rpc('vx_student_final_summary_auth',{p_assignment_id:assignmentId});setFinalSummary(summary?.[0]||null);setStatus('final');setFinalAt(result[0]?.final_at||new Date().toISOString());setStage('summary');setMessage('ส่ง Final เรียบร้อยแล้ว ระบบล็อกคำตอบแล้ว')
  }
 
  function jumpTo(idx){setCurrentIndex(idx);setStage('work');window.scrollTo({top:0,behavior:'smooth'})}
@@ -108,14 +109,14 @@ export default function StudentAssignment(){
     <div className="vx-toolbar vx-exam-tools">{!isMcq&&<button className="vx-file" disabled={!current.drawing_path} onClick={()=>openFile(current.drawing_path)}><FileText size={15}/>{current.drawing_path?'Drawing PDF':'ยังไม่มี PDF'}</button>}<button className={`vx-file ${current.is_flagged?'vx-flag-active':''}`} onClick={()=>toggleFlag(current)}><Flag size={15}/>{current.is_flagged?'ติดธงแล้ว':'มาร์กไม่แน่ใจ'}</button></div>
 
     {isMcq?<div className="vx-exam-choices">{(current.mcq_choices||[]).map(c=><label key={c.key} className={`vx-exam-choice ${a.choice===c.key?'selected':''}`}><input type="radio" name={`q-${current.item_id}`} checked={a.choice===c.key} onChange={()=>chooseMcq(current,c.key)} disabled={status==='final'||savingId!==null}/><b>{thaiKey[c.key]||c.key}.</b><span>{c.text}</span></label>)}</div>
-    :<div className="vx-form"><div className="vx-empty" style={{marginTop:0}}>เขียนชิ้นงานตาม Drawing แล้วนำค่าจาก Mass Properties มากรอกด้านล่าง</div><div className="vx-mass-grid"><label>Volume mm³<input value={a.volume??''} onChange={e=>changeCad(current.item_id,'volume',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>Surface Area mm²<input value={a.surface_area??''} onChange={e=>changeCad(current.item_id,'surface_area',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>Mass g<input value={a.mass??''} onChange={e=>changeCad(current.item_id,'mass',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>COM X<input value={a.com_x??''} onChange={e=>changeCad(current.item_id,'com_x',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>COM Y<input value={a.com_y??''} onChange={e=>changeCad(current.item_id,'com_y',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>COM Z<input value={a.com_z??''} onChange={e=>changeCad(current.item_id,'com_z',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label></div>{status!=='final'&&<button className="vx-btn primary" disabled={savingId!==null} onClick={()=>saveCad(current)}><Save size={15}/>{savingId===current.item_id?'กำลังบันทึก...':'บันทึกค่า CAD'}</button>}</div>}
+    :<div className="vx-form"><div className="vx-empty" style={{marginTop:0}}>เขียนชิ้นงานตาม Drawing แล้วนำค่าจาก Mass Properties มากรอกด้านล่าง</div><div className="vx-mass-grid"><label>Volume mm³<input value={a.volume??''} onChange={e=>changeCad(current.item_id,'volume',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>Surface Area mm²<input value={a.surface_area??''} onChange={e=>changeCad(current.item_id,'surface_area',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label><label>Mass g<input value={a.mass??''} onChange={e=>changeCad(current.item_id,'mass',e.target.value)} type="number" step="0.001" disabled={status==='final'}/></label></div>{status!=='final'&&<button className="vx-btn primary" disabled={savingId!==null} onClick={()=>saveCad(current)}><Save size={15}/>{savingId===current.item_id?'กำลังบันทึก...':'บันทึกค่า CAD'}</button>}</div>}
    </section>
 
    <div className="vx-exam-footer"><button className="vx-exam-arrow" disabled={currentIndex===0} onClick={()=>setCurrentIndex(i=>Math.max(0,i-1))}><ArrowLeft size={28}/></button><button className="vx-btn secondary vx-exam-summary-btn" onClick={()=>setStage('summary')}><ListChecks size={17}/>Summary</button><button className="vx-exam-arrow" disabled={currentIndex===items.length-1} onClick={()=>setCurrentIndex(i=>Math.min(items.length-1,i+1))}><ArrowRight size={28}/></button></div>
   </>}
 
   {stage==='summary'&&<section className="vx-card vx-exam-summary"><div className="vx-exam-summary-head"><div><p className="vx-kicker">SUMMARY</p><h2>{status==='final'?'ส่งการบ้านเรียบร้อยแล้ว':'ภาพรวมคำตอบ'}</h2></div>{status!=='final'&&<button className="vx-file" onClick={()=>setStage('work')}>กลับไปทำต่อ</button>}</div>
-   {status==='final'?<div className="vx-result"><h3 style={{marginTop:0}}>ส่ง Final แล้ว</h3><p>ส่งเมื่อ {finalAt?new Date(finalAt).toLocaleString('th-TH'):''}</p><p><b>คะแนนจะเปิดให้นักเรียนเห็นหลังครูปิดรับงานเท่านั้น</b></p><Link className="vx-btn primary" href="/verifyx/student">กลับหน้า Assignments</Link></div>:<>
+   {status==='final'?<div className="vx-result"><h3 style={{marginTop:0}}>ส่ง Final แล้ว</h3><p>ส่งเมื่อ {finalAt?new Date(finalAt).toLocaleString('th-TH'):''}</p>{finalSummary?<div className="vx-overview-strip" style={{margin:'16px 0'}}><div><small>คะแนนรวม</small><strong>{Number(finalSummary.total_score||0).toFixed(2)}</strong></div><div><small>เกณฑ์ผ่าน</small><strong>{Number(finalSummary.pass_score||60).toFixed(0)}</strong></div><div><small>ผล</small><strong>{finalSummary.passed?'ผ่าน':'ไม่ผ่าน'}</strong></div></div>:<p>กำลังสรุปคะแนน...</p>}<p><b>เฉลยและรายละเอียดรายข้อจะเปิดหลังครูปิดรับงาน</b></p><Link className="vx-btn primary" href="/verifyx/student">กลับหน้า Assignments</Link></div>:<>
     <div className="vx-summary-grid">{items.map((item,idx)=>{const s=itemState(item);return <button key={item.item_id} className={`vx-summary-cell ${s}`} onClick={()=>jumpTo(idx)}><b>Q{item.slot_no}</b><span>{s==='answered'?'✓':s==='flagged'?'⚑':'×'}</span></button>})}</div>
     <div className="vx-summary-legend"><span>✓ ตอบแล้ว {Math.max(0,completeCount-flaggedCount)}</span><span>⚑ ไม่แน่ใจ {flaggedCount}</span><span>× ยังไม่ตอบ {items.length-completeCount}</span></div>
     <div className={canFinal?'vx-success':'vx-error'}>{canFinal?'ตอบครบทุกข้อแล้ว พร้อม Final':`ยังตอบไม่ครบ ${items.length-completeCount} ข้อ`}</div>
