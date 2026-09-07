@@ -60,7 +60,7 @@ export default function QuestionBankPage(){
 
  async function upload(file,folder){if(!file?.name)return null;const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');const path=`question-bank/${folder}/${crypto.randomUUID()}-${safe}`;const {error}=await vx.storage.from(VX_BUCKET).upload(path,file,{upsert:false});if(error)throw error;return path}
  function lotSuffix(lot){const value=String(lot||'');const prefix=teacherCode?`${teacherCode}-`:'';if(prefix&&value.startsWith(prefix))return value.slice(prefix.length)||'001';return value.split('-').pop()||'001'}
- function prefixForCategory(category){return category==='assembly'?'ASM':category==='drawing'?'DRAW':category==='sheet_metal'?'SHEET':category==='surface'?'SURF':'PART'}
+ function prefixForCategory(category){return category==='assembly'?'ASSY':category==='drawing'?'DRAW':category==='sheet_metal'?'SHEET':category==='surface'?'SURF':'PART'}
  function nextCadTitleForFamily(family){
   if(!family)return 'PART-001';
   const rows=items.filter(x=>x.family_id===family.id),parsed=rows.map(x=>String(x.title||'').trim().toUpperCase().match(/^([A-Z]+)-(\d+)$/)).filter(Boolean);
