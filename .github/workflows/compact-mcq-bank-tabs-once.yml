@@ -1,0 +1,30 @@
+name: Compact MCQ Bank Tabs Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/oneoff/compact-mcq-bank-tabs.py'
+      - '.github/workflows/compact-mcq-bank-tabs-once.yml'
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run patch
+        run: python3 scripts/oneoff/compact-mcq-bank-tabs.py
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verifyx/teacher/question-bank/page.js
+          git commit -m "fix: compact and align MCQ bank tabs"
+          git push
