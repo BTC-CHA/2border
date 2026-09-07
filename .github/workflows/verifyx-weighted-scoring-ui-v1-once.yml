@@ -1,0 +1,35 @@
+name: VerifyX Weighted Scoring UI V1 Once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verifyx-weighted-scoring-ui-v1-once.yml'
+      - 'scripts/oneoff/verifyx-weighted-scoring-ui-v1.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply weighted scoring UI patch
+        run: python scripts/oneoff/verifyx-weighted-scoring-ui-v1.py
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verifyx/teacher/page.js app/verifyx/teacher/results/page.js app/verifyx/student/results/page.js 'app/verifyx/student/assignment/[id]/page.js'
+          if git diff --cached --quiet; then
+            echo "No source changes"
+          else
+            git commit -m "feat: add weighted assignment scoring"
+            git push
+          fi
