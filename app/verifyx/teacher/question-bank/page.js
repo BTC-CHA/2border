@@ -23,7 +23,7 @@ export default function QuestionBankPage(){
  const [mode,setMode]=useState('cad'),[mcqTab,setMcqTab]=useState('school'),[filter,setFilter]=useState('all'),[search,setSearch]=useState('');
  const [cadCategory,setCadCategory]=useState('all'),[cadLot,setCadLot]=useState('all');
  const [showCadQuestion,setShowCadQuestion]=useState(false),[showMcq,setShowMcq]=useState(false),[selectedSystem,setSelectedSystem]=useState([]);
- const [teacherCode,setTeacherCode]=useState(''),[editCadId,setEditCadId]=useState(null);
+ const [teacherCode,setTeacherCode]=useState(''),[editCadId,setEditCadId]=useState(null),[cadCodeChoice,setCadCodeChoice]=useState('');
 
  async function load(){
   setLoading(true);setError('');
@@ -58,39 +58,50 @@ export default function QuestionBankPage(){
  async function addCadQuestion(e){
   e.preventDefault();if(saving)return;setSaving(true);setError('');setMessage('');
   const form=e.currentTarget,fd=new FormData(form);
-  let familyId=null;
+  let familyId=null,createdFamily=false;
   try{
-   const code=String(fd.get('code')||'').trim().toUpperCase();
+   const codeChoice=String(fd.get('codeChoice')||'').trim();
+   if(!codeChoice)throw new Error('กรุณาเลือก Code');
    const title=String(fd.get('title')||'').trim();
-   const category=String(fd.get('category')||'part_modeling');
-   const difficulty=String(fd.get('difficulty')||'basic');
-   const lotCode=String(fd.get('lotCode')||'').trim();
-   const lot=teacherCode&&lotCode?`${teacherCode}-${lotCode}`:'';
-   if(!lot)throw new Error('ไม่พบชื่อครูหรือรหัส Lot');
-   const {data:exists,error:checkError}=await vx.from('vx_question_families').select('id').eq('code',code).limit(1);
-   if(checkError)throw checkError;
-   if((exists||[]).length)throw new Error(`Code ${code} มีอยู่แล้ว กรุณาใช้ Code ใหม่`);
+   if(!title)throw new Error('กรุณาใส่ชื่อโจทย์');
+
+   if(codeChoice==='__new__'){
+    const code=String(fd.get('newCode')||'').trim().toUpperCase();
+    const category=String(fd.get('category')||'part_modeling');
+    const difficulty=String(fd.get('difficulty')||'basic');
+    const lotCode=String(fd.get('lotCode')||'').trim();
+    const lot=teacherCode&&lotCode?`${teacherCode}-${lotCode}`:'';
+    if(!code)throw new Error('กรุณาใส่ Code ใหม่');
+    if(!lot)throw new Error('ไม่พบชื่อครูหรือรหัส Lot');
+    const {data:exists,error:checkError}=await vx.from('vx_question_families').select('id').eq('code',code).limit(1);
+    if(checkError)throw checkError;
+    if((exists||[]).length)throw new Error(`Code ${code} มีอยู่แล้ว กรุณาเลือกจาก Dropdown`);
+    const {data:family,error:familyError}=await vx.from('vx_question_families').insert({code,name:code,category,lot,difficulty,description:''}).select('id').single();
+    if(familyError)throw familyError;
+    familyId=family?.id;createdFamily=true;
+   }else{
+    const {data:family,error:familyError}=await vx.from('vx_question_families').select('id').eq('code',codeChoice).single();
+    if(familyError)throw familyError;
+    familyId=family?.id;
+   }
+   if(!familyId)throw new Error('ไม่พบกลุ่ม Code ที่เลือก');
 
    const drawing=fd.get('drawing'),image=fd.get('modelImage');
    const drawingPath=await upload(drawing,'drawing');
    const imagePath=image?.name?await upload(image,'model'):null;
-
-   const {data:family,error:familyError}=await vx.from('vx_question_families').insert({code,name:code,category,lot,difficulty,description:''}).select('id').single();
-   if(familyError)throw familyError;
-   familyId=family?.id;
-   if(!familyId)throw new Error('สร้างข้อมูลโจทย์ไม่สำเร็จ');
+   const variantCode=`Q-${crypto.randomUUID().slice(0,8).toUpperCase()}`;
 
    const {error:questionError}=await vx.from('vx_question_bank').insert({
-    family_id:familyId,variant_code:'A',title,drawing_path:drawingPath,drawing_name:drawing?.name||null,
+    family_id:familyId,variant_code:variantCode,title,drawing_path:drawingPath,drawing_name:drawing?.name||null,
     model_image_path:imagePath,model_image_name:image?.name||null,show_model_preview:Boolean(imagePath)&&fd.get('preview')==='on',
     reference_volume:Number(fd.get('volume')).toFixed(3),reference_area:Number(fd.get('area')).toFixed(3),reference_mass:Number(fd.get('mass')).toFixed(3),
     reference_com_x:0,reference_com_y:0,reference_com_z:0
    });
    if(questionError)throw questionError;
 
-   form.reset();setShowCadQuestion(false);setMessage('เพิ่มโจทย์ CAD แล้ว');await load();
+   form.reset();setCadCodeChoice('');setShowCadQuestion(false);setMessage('เพิ่มโจทย์ CAD แล้ว');await load();
   }catch(err){
-   if(familyId)await vx.from('vx_question_families').delete().eq('id',familyId);
+   if(createdFamily&&familyId)await vx.from('vx_question_families').delete().eq('id',familyId);
    setError(err.message);
   }finally{setSaving(false)}
  }
@@ -142,7 +153,7 @@ export default function QuestionBankPage(){
  function changeCategory(value){setCadCategory(value);setCadLot('all')}
 
  return <main className="vx-page"><div className="vx-wrap"><TeacherNav active="bank"/>
-  <header className="vx-top"><div><p className="vx-kicker">QUESTION BANK</p><h1>คลังโจทย์</h1><p>School Central Question Bank · CAD / Mass Properties + ปรนัย พร้อม Category และ Lot</p></div><div className="vx-toolbar"><button className="vx-btn secondary" onClick={load}><RefreshCw size={15}/>Refresh</button>{mode==='cad'?<button className="vx-btn primary" onClick={()=>{setShowCadQuestion(v=>!v);setEditCadId(null)}}><Plus size={15}/>เพิ่มโจทย์ CAD</button>:mcqTab==='school'?<button className="vx-btn primary" onClick={()=>setShowMcq(v=>!v)}><Plus size={15}/>เพิ่มข้อปรนัย</button>:<button className="vx-btn primary" disabled={!selectedSystem.length||saving} onClick={importSelected}><Download size={15}/>นำเข้า {selectedSystem.length} ข้อ</button>}</div></header>
+  <header className="vx-top"><div><p className="vx-kicker">QUESTION BANK</p><h1>คลังโจทย์</h1><p>School Central Question Bank · CAD / Mass Properties + ปรนัย พร้อม Category และ Lot</p></div><div className="vx-toolbar"><button className="vx-btn secondary" onClick={load}><RefreshCw size={15}/>Refresh</button>{mode==='cad'?<button className="vx-btn primary" onClick={()=>{setShowCadQuestion(v=>!v);setEditCadId(null);setCadCodeChoice('')}}><Plus size={15}/>เพิ่มโจทย์ CAD</button>:mcqTab==='school'?<button className="vx-btn primary" onClick={()=>setShowMcq(v=>!v)}><Plus size={15}/>เพิ่มข้อปรนัย</button>:<button className="vx-btn primary" disabled={!selectedSystem.length||saving} onClick={importSelected}><Download size={15}/>นำเข้า {selectedSystem.length} ข้อ</button>}</div></header>
   {message&&<div className="vx-success">{message}</div>}{error&&<div className="vx-error">{error}</div>}
 
   <div className="vx-toolbar" style={{marginTop:14}}><button className={`vx-btn ${mode==='cad'?'primary':'secondary'}`} onClick={()=>setMode('cad')}>CAD / Mass Properties</button><button className={`vx-btn ${mode==='mcq'?'primary':'secondary'}`} onClick={()=>{setMode('mcq');setShowCadQuestion(false);setEditCadId(null)}}>ปรนัย / Multiple Choice</button></div>
@@ -153,7 +164,7 @@ export default function QuestionBankPage(){
    {mode==='cad'&&<div className="vx-form-row" style={{marginTop:10}}><label>Category<select value={cadCategory} onChange={e=>changeCategory(e.target.value)}><option value="all">ทุก Category</option>{cadCategories.map(c=><option key={c} value={c}>{categoryLabel[c]||c}</option>)}</select></label><label>Lot<select value={cadLot} onChange={e=>setCadLot(e.target.value)}><option value="all">ทุก Lot</option>{cadLots.map(l=><option key={l} value={l}>{l}</option>)}</select></label></div>}
   </section>
 
-  {mode==='cad'&&showCadQuestion&&<section className="vx-card"><p className="vx-kicker">NEW CAD QUESTION</p><h3>เพิ่มโจทย์ CAD</h3><form className="vx-form" onSubmit={addCadQuestion}><div className="vx-form-row"><label>Code<input name="code" placeholder="P-001" required/></label><label>ชื่อโจทย์<input name="title" placeholder="เช่น Valve body - 001" required/></label></div><div className="vx-form-row"><label>Category<select name="category" defaultValue="part_modeling">{categoryOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><label>Lot<div style={{display:'grid',gridTemplateColumns:'minmax(100px,1fr) auto minmax(86px,110px)',gap:8,alignItems:'center'}}><input value={teacherCode||'กำลังโหลด...'} readOnly aria-label="Teacher Lot Prefix"/><b>-</b><input name="lotCode" defaultValue="001" inputMode="numeric" pattern="[0-9]{3}" maxLength={3} placeholder="001" required/></div></label><label>Drawing PDF<input name="drawing" type="file" accept="application/pdf,.pdf" required/></label><div className="vx-mass-grid"><label>Volume mm³<input name="volume" type="number" step="0.001" required/></label><label>Surface Area mm²<input name="area" type="number" step="0.001" required/></label><label>Mass g<input name="mass" type="number" step="0.001" required/></label></div><label>Model Reference Image<input name="modelImage" type="file" accept="image/png,image/jpeg,image/webp"/></label><label><span><input name="preview" type="checkbox"/> ให้นักเรียนเห็น Model Image</span></label><button className="vx-btn primary" disabled={saving||!teacherCode}>{saving?'กำลังบันทึก...':'บันทึกโจทย์ CAD'}</button></form></section>}
+  {mode==='cad'&&showCadQuestion&&<section className="vx-card"><p className="vx-kicker">NEW CAD QUESTION</p><h3>เพิ่มโจทย์ CAD</h3><form className="vx-form" onSubmit={addCadQuestion}><div className="vx-form-row"><label>Code<select name="codeChoice" value={cadCodeChoice} onChange={e=>setCadCodeChoice(e.target.value)} required><option value="" disabled>เลือก Code</option>{families.map(f=><option key={f.id} value={f.code}>{f.code}</option>)}<option value="__new__">+ สร้าง Code ใหม่</option></select></label><label>ชื่อโจทย์<input name="title" placeholder="เช่น PART-003" required/></label></div>{cadCodeChoice==='__new__'?<><label>Code ใหม่<input name="newCode" placeholder="เช่น 3D-EXERCISES" required/></label><div className="vx-form-row"><label>Category<select name="category" defaultValue="part_modeling">{categoryOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>ระดับ<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><label>Lot<div style={{display:'grid',gridTemplateColumns:'minmax(100px,1fr) auto minmax(86px,110px)',gap:8,alignItems:'center'}}><input value={teacherCode||'กำลังโหลด...'} readOnly aria-label="Teacher Lot Prefix"/><b>-</b><input name="lotCode" defaultValue="001" inputMode="numeric" pattern="[0-9]{3}" maxLength={3} placeholder="001" required/></div></label></>:cadCodeChoice?<div className="vx-result">ใช้ Category · ระดับ · Lot ของ Code <b>{cadCodeChoice}</b> อัตโนมัติ</div>:null}<label>Drawing PDF<input name="drawing" type="file" accept="application/pdf,.pdf" required/></label><div className="vx-mass-grid"><label>Volume mm³<input name="volume" type="number" step="0.001" required/></label><label>Surface Area mm²<input name="area" type="number" step="0.001" required/></label><label>Mass g<input name="mass" type="number" step="0.001" required/></label></div><label>Model Reference Image<input name="modelImage" type="file" accept="image/png,image/jpeg,image/webp"/></label><label><span><input name="preview" type="checkbox"/> ให้นักเรียนเห็น Model Image</span></label><button className="vx-btn primary" disabled={saving||!cadCodeChoice||(cadCodeChoice==='__new__'&&!teacherCode)}>{saving?'กำลังบันทึก...':'บันทึกโจทย์ CAD'}</button></form></section>}
 
   {mode==='mcq'&&mcqTab==='school'&&showMcq&&<section className="vx-card"><p className="vx-kicker">NEW MCQ</p><h3>เพิ่มข้อสอบปรนัย</h3><form className="vx-form" onSubmit={addMcq}><div className="vx-form-row"><label>Subject<input name="subject" defaultValue="SolidWorks" required/></label><label>Difficulty<select name="difficulty" defaultValue="basic"><option value="basic">Basic</option><option value="pro">Pro</option><option value="advanced">Advanced</option></select></label></div><div className="vx-form-row"><label>Category Code<input name="categoryCode" placeholder="เช่น SKETCH"/></label><label>Category Name<input name="categoryName" placeholder="เช่น Sketch Tools"/></label></div><label>คำถาม<textarea name="stem" rows="3" required/></label>{['A','B','C','D'].map(k=><label key={k}>ตัวเลือก {thaiKey[k]} ({k})<input name={`choice${k}`} required/></label>)}<div className="vx-form-row"><label>เฉลย<select name="correct" defaultValue="A"><option value="A">ก (A)</option><option value="B">ข (B)</option><option value="C">ค (C)</option><option value="D">ง (D)</option></select></label><label>สถานะ<select name="status" defaultValue="active"><option value="active">พร้อมใช้</option><option value="draft">Draft</option></select></label></div><label>คำอธิบายเฉลย<textarea name="explanation" rows="2"/></label><button className="vx-btn primary" disabled={saving}>{saving?'กำลังบันทึก...':'บันทึกข้อสอบ'}</button></form></section>}
 
