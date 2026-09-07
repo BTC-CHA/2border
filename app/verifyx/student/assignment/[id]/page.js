@@ -8,6 +8,14 @@ import {vx,VX_BUCKET} from '../../../vxClient';
 
 const blankCad={volume:'',surface_area:'',mass:'',com_x:'',com_y:'',com_z:'',saved:false,dirty:false};
 const thaiKey={A:'ก',B:'ข',C:'ค',D:'ง'};
+const VX_DEVICE_KEY='verifyx_device_id_v1';
+function getVerifyXDeviceId(){
+ try{
+  let id=localStorage.getItem(VX_DEVICE_KEY);
+  if(!id){id=`VX-${crypto.randomUUID()}`;localStorage.setItem(VX_DEVICE_KEY,id)}
+  return id;
+ }catch{return `VX-${crypto.randomUUID()}`}
+}
 
 export default function StudentAssignment(){
  const {id}=useParams();
@@ -74,7 +82,7 @@ export default function StudentAssignment(){
   if(!canFinal||finalizing)return;
   if(flaggedCount>0&&!confirm(`ยังมี ${flaggedCount} ข้อที่ติดธงอยู่\nยืนยันว่าจะ Final จริงหรือไม่?`))return;
   if(!confirm('หลัง Final แล้วจะกลับมาแก้คำตอบไม่ได้\nยืนยันส่งคำตอบสุดท้าย?'))return;
-  setFinalizing(true);setError('');const {data,error}=await vx.rpc('vx_student_finalize_assignment_v3_auth',{p_assignment_id:assignmentId});setFinalizing(false);
+  setFinalizing(true);setError('');const deviceId=getVerifyXDeviceId();const {data,error}=await vx.rpc('vx_student_finalize_assignment_v4_auth',{p_assignment_id:assignmentId,p_device_id:deviceId,p_user_agent:navigator.userAgent||''});setFinalizing(false);
   if(error){setError(error.message);return}
   const result=data||[];setStatus('final');setFinalAt(result[0]?.final_at||new Date().toISOString());setStage('summary');setMessage('ส่ง Final เรียบร้อยแล้ว ระบบล็อกคำตอบแล้ว')
  }
