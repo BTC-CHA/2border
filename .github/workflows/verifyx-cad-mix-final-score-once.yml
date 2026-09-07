@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/verifyx-cad-mix-final-score-once.yml'
       - 'scripts/oneoff/verifyx-cad-mix-final-score.py'
+      - 'scripts/oneoff/verifyx-cad-mix-final-score-fix.py'
   workflow_dispatch:
 
 permissions:
@@ -18,12 +19,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Correct patch matcher
+        run: python scripts/oneoff/verifyx-cad-mix-final-score-fix.py
       - name: Apply patch
         run: python scripts/oneoff/verifyx-cad-mix-final-score.py
       - name: Commit changes
         run: |
-          if git diff --quiet; then
-            echo "No changes"
+          if git diff --quiet -- app/verifyx/teacher/page.js app/verifyx/student/assignment/'[id]'/page.js; then
+            echo "No app changes"
             exit 0
           fi
           git config user.name "github-actions[bot]"
