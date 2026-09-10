@@ -1,0 +1,35 @@
+name: VerifyX Training Student Signup V1 Once
+
+on:
+  push:
+    paths:
+      - 'scripts/oneoff/verifyx-training-student-signup-v1.py'
+      - '.github/workflows/verifyx-training-student-signup-v1-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply temporary training signup patch
+        run: python scripts/oneoff/verifyx-training-student-signup-v1.py
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verifyx/student/page.js
+          if git diff --cached --quiet; then
+            echo "No source changes"
+          else
+            git commit -m "feat: enable temporary training student signup"
+            git push
+          fi
