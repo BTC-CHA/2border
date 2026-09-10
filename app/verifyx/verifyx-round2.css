@@ -159,3 +159,12 @@
  .vx-exam-flag-btn{width:100%!important;margin-left:0;justify-content:center;}
  .vx-student-result-card .vx-history-head{grid-template-columns:1fr;gap:10px;}
 }
+
+
+/* VERIFYX_STUDENT_EXAM_CONTROLS_CENTER_V1 */
+@media(min-width:701px){
+ .vx-cad-save-btn{margin:10px auto 0!important;justify-content:center!important;}
+ .vx-exam-footer{justify-content:center!important;}
+ .vx-exam-navcluster{flex:0 0 auto;}
+ .vx-exam-flag-btn{margin-left:0!important;}
+}
