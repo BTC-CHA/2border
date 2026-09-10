@@ -1,0 +1,35 @@
+name: VerifyX CAD Mix Restore ASSY Fields Once
+
+on:
+  push:
+    paths:
+      - 'scripts/oneoff/verifyx-cad-mix-restore-assy-fields.py'
+      - '.github/workflows/verifyx-cad-mix-restore-assy-fields-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply CAD mix field restore patch
+        run: python scripts/oneoff/verifyx-cad-mix-restore-assy-fields.py
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verifyx/teacher/teacher-ui.css
+          if git diff --cached --quiet; then
+            echo "No source changes"
+          else
+            git commit -m "fix: restore Assembly and CAD Lot fields in assignment form"
+            git push
+          fi
