@@ -1,0 +1,2 @@
+VerifyX temporary training student signup production build trigger
+source commit: 45c7ac5c7c076babe99168aaa288cbff09381708
