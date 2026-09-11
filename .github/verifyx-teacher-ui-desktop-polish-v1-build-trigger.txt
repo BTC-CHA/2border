@@ -1,0 +1,3 @@
+VerifyX teacher UI desktop polish V1
+Final CSS commit: f6eabf0879c9bac25dbdf1deee3828568cbb4b1e
+Scope: UI/CSS only
