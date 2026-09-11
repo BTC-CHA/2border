@@ -88,5 +88,5 @@ block = r'''
 }
 '''
 
-path.write_text(text.rstrip() + block + '\n', encoding='utf-8')
+path.write_text(text.rstrip() + block.rstrip() + '\n', encoding='utf-8')
 print('applied', marker)
