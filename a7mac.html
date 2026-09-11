@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>A7 MAC Collector</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;padding:18px}.wrap{max-width:680px;margin:18px auto}
+    .panel,.card,.warn{background:#fff;border:1px solid #e5e9f0;border-radius:18px;padding:22px;box-shadow:0 8px 30px rgba(17,24,39,.06)}
+    h1{font-size:27px;margin:8px 0 8px}.sub{color:#687386;margin:0 0 20px;line-height:1.55}
+    .badge{display:inline-block;padding:5px 10px;border-radius:999px;background:#e9f8ef;color:#18763a;font-weight:800;font-size:12px}
+    .count{margin:14px 0 18px;padding:12px 14px;border-radius:12px;background:#eef4ff;font-weight:800}
+    .label{font-size:13px;color:#687386;margin-bottom:6px}input{width:100%;padding:13px 14px;border:1px solid #d8dee9;border-radius:12px;font-size:17px;margin-bottom:14px}
+    button{width:100%;border:0;border-radius:12px;padding:15px 18px;font-size:18px;font-weight:800;cursor:pointer;background:#172033;color:#fff}button:disabled{opacity:.55;cursor:default}
+    .status{margin-top:16px;padding:13px 14px;border-radius:12px;background:#f1f4f9;color:#465267;display:none;line-height:1.5}
+    .card{margin-top:18px;display:none}.warn{margin-top:18px;display:none;background:#fff8e6;border-color:#f0d384}.ok{font-weight:900;font-size:19px;margin-bottom:14px}.row{display:grid;grid-template-columns:150px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid #eef1f5}.row:last-child{border-bottom:0}.k{color:#687386}.v{font-weight:700;word-break:break-all}.help{font-size:13px;color:#687386;margin-top:14px;line-height:1.6}
+    @media(max-width:560px){body{padding:12px}.wrap{margin:5px auto}.panel,.card,.warn{padding:18px}.row{grid-template-columns:1fr;gap:2px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <div class="badge">A7 Solutions</div>
+    <h1>เก็บ MAC Address</h1>
+    <p class="sub">กดปุ่ม 1 ครั้ง → เปิดไฟล์ <b>Register-PC.cmd</b> ที่ดาวน์โหลดมา 1 ครั้ง → รอการ์ดข้อมูลขึ้นหน้านี้ แล้วไปเครื่องถัดไปได้เลย</p>
+    <div id="count" class="count">เก็บแล้ว: กำลังตรวจสอบ...</div>
+    <div class="label">หมายเลขเครื่อง (ถ้ามี)</div>
+    <input id="station" placeholder="เช่น 01" maxlength="40" inputmode="numeric" />
+    <button id="go">เก็บ MAC Address เครื่องนี้</button>
+    <div id="status" class="status"></div>
+    <div class="help">ไฟล์นี้ไม่ติดตั้งโปรแกรมค้างไว้ในเครื่อง ใช้เก็บข้อมูลครั้งเดียวแล้วปิดตัวเอง</div>
+  </div>
+
+  <div id="warn" class="warn">
+    <div class="ok">⚠️ เครื่องนี้เคยเก็บข้อมูลแล้ว</div>
+    <div id="warnText"></div>
+  </div>
+
+  <div id="card" class="card">
+    <div class="ok">✅ เก็บข้อมูลสำเร็จ</div>
+    <div class="row"><div class="k">หมายเลขเครื่อง</div><div class="v" id="cStation">-</div></div>
+    <div class="row"><div class="k">Computer Name</div><div class="v" id="cPc">-</div></div>
+    <div class="row"><div class="k">Ethernet MAC</div><div class="v" id="cEth">-</div></div>
+    <div class="row"><div class="k">Wi‑Fi MAC</div><div class="v" id="cWifi">-</div></div>
+    <div class="row"><div class="k">IPv4</div><div class="v" id="cIp">-</div></div>
+    <div class="row"><div class="k">Windows</div><div class="v" id="cWin">-</div></div>
+  </div>
+</div>
+<script>
+const API='https://nfqlgzvsnxnruuozkjdw.supabase.co/functions/v1/a7-mac-collector';
+const go=document.getElementById('go');
+const statusBox=document.getElementById('status');
+const card=document.getElementById('card');
+const warn=document.getElementById('warn');
+let pollTimer=null;
+function setStatus(t){statusBox.style.display='block';statusBox.textContent=t}
+async function refreshCount(){
+  try{const r=await fetch(API+'?action=summary',{cache:'no-store'});const d=await r.json();document.getElementById('count').textContent='เก็บแล้ว: '+(d.unique_devices??0)+' เครื่อง';}catch{document.getElementById('count').textContent='เก็บแล้ว: -';}
+}
+function showCard(d){
+  document.getElementById('cStation').textContent=d.station_label||'-';
+  document.getElementById('cPc').textContent=d.pc_name||'-';
+  document.getElementById('cEth').textContent=d.ethernet_mac||'-';
+  document.getElementById('cWifi').textContent=d.wifi_mac||'-';
+  document.getElementById('cIp').textContent=(d.ip_addresses||[]).join(', ')||'-';
+  document.getElementById('cWin').textContent=d.windows_caption||'-';
+  if(d.duplicate&&d.previous){
+    warn.style.display='block';
+    const p=d.previous;
+    const oldStation=p.station_label||'-';
+    const oldPc=p.pc_name||'-';
+    const when=p.reported_at?new Date(p.reported_at).toLocaleString('th-TH'):'-';
+    document.getElementById('warnText').textContent='ข้อมูลเดิม: เครื่อง '+oldStation+' / '+oldPc+' / เก็บล่าสุด '+when+' — ระบบไม่ถือว่าเป็นเครื่องใหม่';
+  }else{warn.style.display='none'}
+  card.style.display='block';
+  setStatus('เรียบร้อย — ย้ายไปเครื่องถัดไปได้เลย');
+  go.disabled=false;
+  refreshCount();
+}
+async function poll(id){
+  try{
+    const r=await fetch(API+'?action=status&session='+encodeURIComponent(id),{cache:'no-store'});
+    const d=await r.json();
+    if(d.status==='reported'){clearInterval(pollTimer);showCard(d);return}
+    if(d.error){clearInterval(pollTimer);setStatus('เกิดข้อผิดพลาด: '+d.error);go.disabled=false}
+  }catch(e){}
+}
+go.addEventListener('click',async()=>{
+  go.disabled=true;card.style.display='none';warn.style.display='none';setStatus('กำลังเตรียมไฟล์...');
+  try{
+    const station=document.getElementById('station').value.trim();
+    const r=await fetch(API+'?action=session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({station_label:station})});
+    const d=await r.json();
+    if(!r.ok||!d.session)throw new Error(d.error||'สร้าง session ไม่สำเร็จ');
+    const a=document.createElement('a');
+    a.href=API+'?action=download&session='+encodeURIComponent(d.session);
+    a.target='_self';
+    document.body.appendChild(a);a.click();a.remove();
+    setStatus('ดาวน์โหลดแล้ว — เปิด Register-PC.cmd จากรายการดาวน์โหลด แล้วรอสักครู่');
+    pollTimer=setInterval(()=>poll(d.session),1200);poll(d.session);
+  }catch(e){setStatus('เกิดข้อผิดพลาด: '+e.message);go.disabled=false}
+});
+refreshCount();
+</script>
+</body>
+</html>
