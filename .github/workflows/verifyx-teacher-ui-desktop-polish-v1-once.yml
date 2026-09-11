@@ -1,0 +1,48 @@
+name: VerifyX Teacher UI Desktop Polish V1 Once
+
+on:
+  push:
+    paths:
+      - 'scripts/oneoff/verifyx-teacher-ui-desktop-polish-v1.py'
+      - '.github/workflows/verifyx-teacher-ui-desktop-polish-v1-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply desktop UI polish
+        run: python scripts/oneoff/verifyx-teacher-ui-desktop-polish-v1.py
+      - name: Validate scope
+        shell: bash
+        run: |
+          git diff --check
+          changed="$(git diff --name-only)"
+          echo "$changed"
+          test "$changed" = "app/verifyx/teacher/teacher-ui.css"
+          grep -q 'VERIFYX_TEACHER_DESKTOP_POLISH_V1' app/verifyx/teacher/teacher-ui.css
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit UI-only change
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/verifyx/teacher/teacher-ui.css
+          git commit -m 'style: polish VerifyX teacher desktop UI'
+          git push origin HEAD:main
