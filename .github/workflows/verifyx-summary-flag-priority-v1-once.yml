@@ -1,0 +1,45 @@
+name: VerifyX Summary Flag Priority V1 Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/oneoff/verifyx-summary-flag-priority-v1.py'
+      - '.github/workflows/verifyx-summary-flag-priority-v1-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply summary flag priority patch
+        run: python scripts/oneoff/verifyx-summary-flag-priority-v1.py
+      - name: Validate scope
+        shell: bash
+        run: |
+          git diff --check
+          changed="$(git diff --name-only)"
+          echo "$changed"
+          test "$changed" = "app/verifyx/student/assignment/[id]/page.js"
+          grep -q "if(item.is_flagged)return 'flagged';if(!saved)return 'unanswered'" "app/verifyx/student/assignment/[id]/page.js"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "app/verifyx/student/assignment/[id]/page.js"
+          git commit -m "fix: show flagged unanswered items in student summary" || exit 0
+          git push origin main
