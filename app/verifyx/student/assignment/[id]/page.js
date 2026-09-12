@@ -98,7 +98,7 @@ export default function StudentAssignment(){
  }
 
  function jumpTo(idx){setCurrentIndex(idx);setStage('work');window.scrollTo({top:0,behavior:'smooth'})}
- function itemState(item){const saved=!!answers[item.item_id]?.saved;if(!saved)return 'unanswered';if(item.is_flagged)return 'flagged';return 'answered'}
+ function itemState(item){const saved=!!answers[item.item_id]?.saved;if(item.is_flagged)return 'flagged';if(!saved)return 'unanswered';return 'answered'}
  function finalItemPass(r){return r.question_type==='mcq'?Boolean(r.mcq_correct):Number(r.score||0)>=99.995}
  function finalChoiceLabel(r,key){if(!key)return '—';const c=(r.mcq_choices||[]).find(x=>x.key===key);return `${thaiKey[key]||key}. ${c?.text||''}`.trim()}
  function finalMassError(r){const a=Number(r.mass),b=Number(r.reference_mass);if(!Number.isFinite(a)||!Number.isFinite(b))return null;return b===0?Math.abs(a-b):Math.abs(a-b)/Math.abs(b)*100}
